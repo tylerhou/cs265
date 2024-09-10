@@ -1,0 +1,4 @@
+(executable
+ (public_name bril_opt)
+ (name main)
+ (libraries bril_opt))

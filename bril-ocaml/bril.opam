@@ -1,6 +1,7 @@
 opam-version: "2.0"
 version: "1.2.0"
 homepage: "https://github.com/sampsyo/bril/tree/master/bril-ocaml"
+dev-repo: "git://home/tylerhou/code/cs265/bril-ocaml"
 bug-reports: "https://github.com/sampsyo/bril/tree/master/bril-ocaml"
 authors: "6120"
 maintainer: "6120"
