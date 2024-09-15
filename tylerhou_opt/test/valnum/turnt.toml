@@ -1,0 +1,1 @@
+command = "bril2json < {filename} | (../../_build/install/default/bin/opt || dune exec opt) | bril2txt"

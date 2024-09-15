@@ -1,11 +1,11 @@
 (lang dune 3.16)
 
-(name bril_opt)
+(name tylerhou_opt)
 
 (generate_opam_files true)
 
 (package
- (name bril_opt)
+ (name tylerhou_opt)
  (depends ocaml dune core ppx_jane bril))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html
