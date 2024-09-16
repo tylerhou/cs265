@@ -66,7 +66,7 @@ module Numbering : sig
   *)
   type t =
     { number_by_var : Number.t Var.Map.t
-    ; var_by_number : Var.t Number.Map.t (* TODO: var_expr_by_number *)
+    ; var_by_number : Var.t Number.Map.t
     ; number_by_expr : Number.t Expr.Map.t
     ; rdeps_by_number : Number.t list Number.Map.t
     ; simplified : Expr.t Number.Map.t
