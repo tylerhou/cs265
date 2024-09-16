@@ -48,6 +48,7 @@ end
 module Expr = struct
   module T = struct
     type t =
+      | Const of Bril.Const.t
       | Unary of Bril.Op.Unary.t * Number.t
       | Binary of Bril.Op.Binary.t * Number.t * Number.t
     [@@deriving compare, sexp_of]
@@ -68,12 +69,12 @@ module Numbering : sig
     ; var_by_number : Var.t Number.Map.t (* TODO: var_expr_by_number *)
     ; number_by_expr : Number.t Expr.Map.t
     ; rdeps_by_number : Number.t list Number.Map.t
+    ; simplified : Expr.t Number.Map.t
     ; next_number : Number.t
     }
 
   val empty : t
-
-  (*val to_var : t -> Number.t -> Var.t*)
+  val to_var : t -> Number.t -> Var.t
   val of_var : t -> Var.t -> Number.t option
   val expr_of_ins : t -> Bril.Instr.t -> t * (Bril.Dest.t * Expr.t) option
 
@@ -81,15 +82,19 @@ module Numbering : sig
     :  t
     -> Var.t
     -> Expr.t
-    -> t * [ `Expression_available of Var.t | `New_expression ]
+    -> t * [ `Available_expression of Number.t | `New_expression of Number.t ]
 
   val clobber : t -> Number.t -> t
+  val simplify : t -> Number.t -> Expr.t -> t * Expr.t
+  val simplified : t -> Number.t -> Expr.t option
+  val to_instr : t -> Bril.Dest.t -> Expr.t -> Bril.Instr.t
 end = struct
   type t =
     { number_by_var : Number.t Var.Map.t
     ; var_by_number : Var.t Number.Map.t
     ; number_by_expr : Number.t Expr.Map.t
     ; rdeps_by_number : Number.t list Number.Map.t
+    ; simplified : Expr.t Number.Map.t
     ; next_number : Number.t
     }
 
@@ -98,6 +103,7 @@ end = struct
     ; var_by_number = Number.Map.empty
     ; number_by_expr = Expr.Map.empty
     ; rdeps_by_number = Number.Map.empty
+    ; simplified = Number.Map.empty
     ; next_number = Number.zero
     }
   ;;
@@ -123,6 +129,7 @@ end = struct
       | None -> number_var t v
     in
     match ins with
+    | Const (dest, const) -> t, Some (dest, Const const)
     | Unary (dest, op, var) ->
       let t, var = of_var t var in
       t, Some (dest, Unary (op, var))
@@ -134,10 +141,16 @@ end = struct
   ;;
 
   let number_expr (t : t) (var : Var.t) (expr : Expr.t) =
-    match Map.find t.number_by_expr expr with
+    (* Copy propagation *)
+    let number =
+      match expr with
+      | Unary (Id, number) -> Some number
+      | _ -> Map.find t.number_by_expr expr
+    in
+    match number with
     | Some number ->
       let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
-      { t with number_by_var }, `Expression_available (to_var t number)
+      { t with number_by_var }, `Available_expression number
     | None ->
       let t, number = fresh_num t in
       let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
@@ -145,6 +158,7 @@ end = struct
       let number_by_expr = Map.set t.number_by_expr ~key:expr ~data:number in
       let rdeps_by_number =
         match expr with
+        | Const _ -> t.rdeps_by_number
         | Unary (_, var) -> t.rdeps_by_number |> Map.add_multi ~key:var ~data:number
         | Binary (_, left, right) ->
           t.rdeps_by_number
@@ -152,7 +166,7 @@ end = struct
           |> Map.add_multi ~key:right ~data:number
       in
       ( { t with number_by_var; var_by_number; number_by_expr; rdeps_by_number }
-      , `New_expression )
+      , `New_expression number )
   ;;
 
   let clobber (t : t) (dest : Number.t) =
@@ -167,6 +181,83 @@ end = struct
     let rdeps_by_number = Map.filter_keys t.rdeps_by_number ~f:keep in
     { t with number_by_var; number_by_expr; rdeps_by_number }
   ;;
+
+  let simplified (t : t) (num : Number.t) = Map.find t.simplified num
+
+  let simplify (t : t) (num : Number.t) (expr : Expr.t) =
+    eprint_s [%message (expr : Expr.t)];
+    let maybe_simplified : Expr.t option =
+      match expr with
+      | Const _ -> None
+      (* Also copy propagation? *)
+      | Unary (Id, num) ->
+        (match simplified t num with
+         | Some simpl -> Some simpl
+         | None -> None)
+      | Unary (Not, num) ->
+        (match simplified t num with
+         | Some (Const (Bool b)) -> Some (Const (Bool (not b)))
+         | _ -> None)
+      | Binary (op, left, right) ->
+        let result : Bril.Const.t option =
+          match simplified t left, simplified t right with
+          | Some (Const (Int l)), Some (Const (Int r)) ->
+            (match op with
+             | Add -> Some (Int (l + r))
+             | Mul -> Some (Int (l * r))
+             | Sub -> Some (Int (l - r))
+             | Div when r <> 0 -> Some (Int (l / r))
+             | Div -> None
+             | Eq -> Some (Bool (l = r))
+             | Lt -> Some (Bool (l < r))
+             | Gt -> Some (Bool (l > r))
+             | Le -> Some (Bool (l <= r))
+             | Ge -> Some (Bool (l >= r))
+             | _ -> None)
+          | Some (Const (Bool l)), Some (Const (Bool r)) ->
+            (match op with
+             | And -> Some (Bool (l && r))
+             | Or -> Some (Bool (l || r))
+             | _ -> None)
+          | Some (Const (Bool true)), _ | _, Some (Const (Bool true)) ->
+            (match op with
+             | Or -> Some (Bool true)
+             | _ -> None)
+          | Some (Const (Bool false)), _ | _, Some (Const (Bool false)) ->
+            (match op with
+             | And -> Some (Bool false)
+             | _ -> None)
+          | _ ->
+            if Number.equal left right
+            then (
+              match op with
+              | Sub -> Some (Int 0)
+              | Div -> Some (Int 1)
+              | Lt | Gt -> Some (Bool false)
+              | Eq | Le | Ge -> Some (Bool true)
+              | _ -> None)
+            else None
+        in
+        Option.map result ~f:(fun r -> Expr.Const r)
+    in
+    let expr =
+      match maybe_simplified with
+      | None -> expr
+      | Some expr ->
+        eprint_s [%message (expr : Expr.t)];
+        expr
+    in
+    let simplified = Map.add_exn t.simplified ~key:num ~data:expr in
+    { t with simplified }, expr
+  ;;
+
+  let to_instr (t : t) (dest : Bril.Dest.t) (expr : Expr.t) : Bril.Instr.t =
+    let to_var arg = to_var t arg in
+    match expr with
+    | Const const -> Const (dest, const)
+    | Unary (op, arg) -> Unary (dest, op, to_var arg)
+    | Binary (op, left, right) -> Binary (dest, op, to_var left, to_var right)
+  ;;
 end
 
 let run (fn : Bril.Func.t) =
@@ -175,6 +266,7 @@ let run (fn : Bril.Func.t) =
     let _, rev_instrs =
       List.fold block ~init:(Numbering.empty, []) ~f:(fun (numbering, instrs) instr ->
         eprint_s [%message (instr : Bril.Instr.t)];
+        eprint_s [%message "" (numbering.simplified : Expr.t Number.Map.t)];
         let to_clobber =
           match Bril.Instr.dest instr with
           | Some (dest_var, _) -> Numbering.of_var numbering dest_var
@@ -182,17 +274,22 @@ let run (fn : Bril.Func.t) =
         in
         let numbering, instrs =
           match Numbering.expr_of_ins numbering instr with
+          | numbering, None -> numbering, instr :: instrs
           | numbering, Some (((dest_var, _) as dest), expr) ->
             let numbering, result = Numbering.number_expr numbering dest_var expr in
-            let instr : Bril.Instr.t =
+            let numbering, instr =
               match result with
-              | `Expression_available var -> Unary (dest, Id, var)
-              | `New_expression -> instr
+              | `New_expression number ->
+                let numbering, expr = Numbering.simplify numbering number expr in
+                numbering, Numbering.to_instr numbering dest expr
+              | `Available_expression number ->
+                ( numbering
+                , (match Numbering.simplified numbering number with
+                   | None -> Unary (dest, Id, Numbering.to_var numbering number)
+                   | Some expr -> Numbering.to_instr numbering dest expr) )
             in
             numbering, instr :: instrs
-          | numbering, None -> numbering, instr :: instrs
         in
-        eprint_s [%message "" (numbering.number_by_var : Number.t Var.Map.t)];
         let numbering =
           match to_clobber with
           | Some old_dest_number -> Numbering.clobber numbering old_dest_number

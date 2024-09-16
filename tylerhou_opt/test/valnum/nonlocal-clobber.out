@@ -1,4 +1,5 @@
 @main {
+.__b0:
   x: int = const 1;
 .lb:
   y: int = id x;
