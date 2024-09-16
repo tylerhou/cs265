@@ -1,1 +1,1 @@
-val run : 'a -> 'a
+val run : Bril.Func.t -> Bril.Func.t
