@@ -48,20 +48,13 @@ end
 module Expr = struct
   module T = struct
     type t =
-      | Unary of Bril.Op.Unary.t * Var.t
-      | Binary of Bril.Op.Binary.t * Var.t * Var.t
+      | Unary of Bril.Op.Unary.t * Number.t
+      | Binary of Bril.Op.Binary.t * Number.t * Number.t
     [@@deriving compare, sexp_of]
   end
 
   include T
   include Comparable.Make_plain (T)
-
-  let of_ins (ins : Bril.Instr.t) : (Bril.Dest.t * t) option =
-    match ins with
-    | Unary (dest, op, var) -> Some (dest, Unary (op, var))
-    | Binary (dest, op, left, right) -> Some (dest, Binary (op, left, right))
-    | _ -> None
-  ;;
 end
 
 module Numbering : sig
@@ -82,7 +75,7 @@ module Numbering : sig
 
   (*val to_var : t -> Number.t -> Var.t*)
   val of_var : t -> Var.t -> Number.t option
-  val number_var : t -> Var.t -> t
+  val expr_of_ins : t -> Bril.Instr.t -> t * (Bril.Dest.t * Expr.t) option
 
   val number_expr
     :  t
@@ -115,12 +108,29 @@ end = struct
 
   let number_var (t : t) (var : Var.t) =
     match Map.find t.number_by_var var with
-    | Some _ -> t
+    | Some number -> t, number
     | None ->
       let t, number = fresh_num t in
       let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
       let var_by_number = Map.set t.var_by_number ~key:number ~data:var in
-      { t with number_by_var; var_by_number }
+      { t with number_by_var; var_by_number }, number
+  ;;
+
+  let expr_of_ins (t : t) (ins : Bril.Instr.t) : t * (Bril.Dest.t * Expr.t) option =
+    let of_var t v =
+      match of_var t v with
+      | Some num -> t, num
+      | None -> number_var t v
+    in
+    match ins with
+    | Unary (dest, op, var) ->
+      let t, var = of_var t var in
+      t, Some (dest, Unary (op, var))
+    | Binary (dest, op, left, right) ->
+      let t, left = of_var t left in
+      let t, right = of_var t right in
+      t, Some (dest, Binary (op, left, right))
+    | _ -> t, None
   ;;
 
   let number_expr (t : t) (var : Var.t) (expr : Expr.t) =
@@ -135,13 +145,11 @@ end = struct
       let number_by_expr = Map.set t.number_by_expr ~key:expr ~data:number in
       let rdeps_by_number =
         match expr with
-        | Unary (_, var) ->
-          t.rdeps_by_number
-          |> Map.add_multi ~key:(Map.find_exn t.number_by_var var) ~data:number
+        | Unary (_, var) -> t.rdeps_by_number |> Map.add_multi ~key:var ~data:number
         | Binary (_, left, right) ->
           t.rdeps_by_number
-          |> Map.add_multi ~key:(Map.find_exn t.number_by_var left) ~data:number
-          |> Map.add_multi ~key:(Map.find_exn t.number_by_var right) ~data:number
+          |> Map.add_multi ~key:left ~data:number
+          |> Map.add_multi ~key:right ~data:number
       in
       ( { t with number_by_var; var_by_number; number_by_expr; rdeps_by_number }
       , `New_expression )
@@ -173,8 +181,8 @@ let run (fn : Bril.Func.t) =
           | None -> None
         in
         let numbering, instrs =
-          match Expr.of_ins instr with
-          | Some (((dest_var, _) as dest), expr) ->
+          match Numbering.expr_of_ins numbering instr with
+          | numbering, Some (((dest_var, _) as dest), expr) ->
             let numbering, result = Numbering.number_expr numbering dest_var expr in
             let instr : Bril.Instr.t =
               match result with
@@ -182,15 +190,7 @@ let run (fn : Bril.Func.t) =
               | `New_expression -> instr
             in
             numbering, instr :: instrs
-          | None ->
-            (match Bril.Instr.dest instr with
-             | Some (dest_var, _) ->
-               let numbering = Numbering.number_var numbering dest_var in
-               eprint_s
-                 [%message
-                   "" (dest_var : string) (numbering.number_by_var : Number.t Var.Map.t)];
-               numbering, instr :: instrs
-             | None -> numbering, instr :: instrs)
+          | numbering, None -> numbering, instr :: instrs
         in
         eprint_s [%message "" (numbering.number_by_var : Number.t Var.Map.t)];
         let numbering =
