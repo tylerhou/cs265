@@ -74,7 +74,6 @@ module Numbering : sig
     }
 
   val empty : t
-  val to_var : t -> Number.t -> Var.t
   val of_var : t -> Var.t -> Number.t option
   val expr_of_ins : t -> Bril.Instr.t -> t * (Bril.Dest.t * Expr.t) option
 
@@ -85,9 +84,8 @@ module Numbering : sig
     -> t * [ `Available_expression of Number.t | `New_expression of Number.t ]
 
   val clobber : t -> Number.t -> t
-  val simplify : t -> Number.t -> Expr.t -> t * Expr.t
-  val simplified : t -> Number.t -> Expr.t option
-  val to_instr : t -> Bril.Dest.t -> Expr.t -> Bril.Instr.t
+  val add_instr : t -> Bril.Dest.t -> Number.t -> Expr.t -> t * Bril.Instr.t
+  val to_instr : t -> Bril.Dest.t -> Number.t -> Bril.Instr.t
 end = struct
   type t =
     { number_by_var : Number.t Var.Map.t
@@ -176,25 +174,33 @@ end = struct
     { t with number_by_var; number_by_expr; rdeps_by_number }
   ;;
 
-  let simplified (t : t) (num : Number.t) = Map.find t.simplified num
+  let to_instr (t : t) (dest : Bril.Dest.t) (num : Number.t) : Bril.Instr.t =
+    let to_var n = to_var t n in
+    match Map.find t.simplified num with
+    | None -> Unary (dest, Id, to_var num)
+    | Some (Const const) -> Const (dest, const)
+    | Some (Unary (op, arg)) -> Unary (dest, op, to_var arg)
+    | Some (Binary (op, left, right)) -> Binary (dest, op, to_var left, to_var right)
+  ;;
 
-  let simplify (t : t) (num : Number.t) (expr : Expr.t) =
+  let add_instr (t : t) (dest : Bril.Dest.t) (num : Number.t) (expr : Expr.t) =
     eprint_s [%message "Attempting to simplify" (expr : Expr.t)];
+    let simplified num = Map.find t.simplified num in
     let maybe_simplified : Expr.t option =
       match expr with
       | Const _ -> None
       (* Copy propagation *)
       | Unary (Id, num) ->
-        (match simplified t num with
+        (match simplified num with
          | Some simpl -> Some simpl
          | None -> None)
       | Unary (Not, num) ->
-        (match simplified t num with
+        (match simplified num with
          | Some (Const (Bool b)) -> Some (Const (Bool (not b)))
          | _ -> None)
       | Binary (op, left, right) ->
         let result : Bril.Const.t option =
-          match simplified t left, simplified t right with
+          match simplified left, simplified right with
           | Some (Const (Int l)), Some (Const (Int r)) ->
             (match op with
              | Add -> Some (Int (l + r))
@@ -242,15 +248,9 @@ end = struct
         expr
     in
     let simplified = Map.add_exn t.simplified ~key:num ~data:expr in
-    { t with simplified }, expr
-  ;;
-
-  let to_instr (t : t) (dest : Bril.Dest.t) (expr : Expr.t) : Bril.Instr.t =
-    let to_var arg = to_var t arg in
-    match expr with
-    | Const const -> Const (dest, const)
-    | Unary (op, arg) -> Unary (dest, op, to_var arg)
-    | Binary (op, left, right) -> Binary (dest, op, to_var left, to_var right)
+    let t = { t with simplified } in
+    let instr = to_instr t dest num in
+    t, instr
   ;;
 end
 
@@ -273,13 +273,9 @@ let run (fn : Bril.Func.t) =
             let numbering, instr =
               match result with
               | `New_expression number ->
-                let numbering, expr = Numbering.simplify numbering number expr in
-                numbering, Numbering.to_instr numbering dest expr
+                Numbering.add_instr numbering dest number expr
               | `Available_expression number ->
-                ( numbering
-                , (match Numbering.simplified numbering number with
-                   | None -> Unary (dest, Id, Numbering.to_var numbering number)
-                   | Some expr -> Numbering.to_instr numbering dest expr) )
+                numbering, Numbering.to_instr numbering dest number
             in
             numbering, instr :: instrs
         in
