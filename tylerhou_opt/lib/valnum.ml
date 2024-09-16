@@ -141,13 +141,7 @@ end = struct
   ;;
 
   let number_expr (t : t) (var : Var.t) (expr : Expr.t) =
-    (* Copy propagation *)
-    let number =
-      match expr with
-      | Unary (Id, number) -> Some number
-      | _ -> Map.find t.number_by_expr expr
-    in
-    match number with
+    match Map.find t.number_by_expr expr with
     | Some number ->
       let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
       { t with number_by_var }, `Available_expression number
@@ -174,7 +168,7 @@ end = struct
       num :: (Map.find_multi t.rdeps_by_number num |> List.map ~f:find_deps |> List.concat)
     in
     let deps = find_deps dest |> Number.Set.of_list in
-    eprint_s [%message "clobbering" (deps |> Set.to_list : Number.t list)];
+    eprint_s [%message "Clobbering" (deps |> Set.to_list : Number.t list)];
     let keep number = not (Set.mem deps number) in
     let number_by_var = Map.filter t.number_by_var ~f:keep in
     let number_by_expr = Map.filter t.number_by_expr ~f:keep in
@@ -185,11 +179,11 @@ end = struct
   let simplified (t : t) (num : Number.t) = Map.find t.simplified num
 
   let simplify (t : t) (num : Number.t) (expr : Expr.t) =
-    eprint_s [%message (expr : Expr.t)];
+    eprint_s [%message "Attempting to simplify" (expr : Expr.t)];
     let maybe_simplified : Expr.t option =
       match expr with
       | Const _ -> None
-      (* Also copy propagation? *)
+      (* Copy propagation *)
       | Unary (Id, num) ->
         (match simplified t num with
          | Some simpl -> Some simpl
@@ -244,7 +238,7 @@ end = struct
       match maybe_simplified with
       | None -> expr
       | Some expr ->
-        eprint_s [%message (expr : Expr.t)];
+        eprint_s [%message "Simplified to" (expr : Expr.t)];
         expr
     in
     let simplified = Map.add_exn t.simplified ~key:num ~data:expr in
@@ -265,8 +259,7 @@ let run (fn : Bril.Func.t) =
   let run_block (block : Bril.Instr.t list) =
     let _, rev_instrs =
       List.fold block ~init:(Numbering.empty, []) ~f:(fun (numbering, instrs) instr ->
-        eprint_s [%message (instr : Bril.Instr.t)];
-        eprint_s [%message "" (numbering.simplified : Expr.t Number.Map.t)];
+        eprint_s [%message "Processing instruction" (instr : Bril.Instr.t)];
         let to_clobber =
           match Bril.Instr.dest instr with
           | Some (dest_var, _) -> Numbering.of_var numbering dest_var
