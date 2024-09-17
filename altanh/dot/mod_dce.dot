@@ -1,0 +1,13 @@
+digraph {
+  entry [label="entry"];
+  exit [label="exit"];
+  2 [label="  t3: int = sub a t2;"];
+  3 [label="  ret t3;"];
+  1 [label="  t2: int = mul b t1;"];
+  0 [label="  t1: int = div a b;"];
+  entry -> 0;
+  2 -> 3;
+  3 -> exit;
+  1 -> 2;
+  0 -> 1;
+}
