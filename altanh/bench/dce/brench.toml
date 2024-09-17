@@ -1,0 +1,12 @@
+benchmarks = '/Users/altanh/work/cs265-fa24/examples/test/tdce/*.bril'
+extract = 'total_dyn_inst: (\d+)'
+
+[runs.baseline]
+pipeline = ["bril2json", "brili -p {args}"]
+
+[runs.dce]
+pipeline = [
+    "bril2json",
+    "cargo run --manifest-path /Users/altanh/work/cs265-fa24/altanh/Cargo.toml",
+    "brili -p {args}",
+]
