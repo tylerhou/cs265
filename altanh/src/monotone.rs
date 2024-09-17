@@ -165,3 +165,54 @@ pub fn live_variables(func: &Function) -> HashMap<Node, HashSet<String>> {
     let cfg = ControlFlowGraph::new(func);
     analysis.run(&cfg)
 }
+
+/// Observable variables.
+/// A variable is observable after an instruction if it is used by some
+/// effectful instruction after that instruction.
+pub fn observable_variables(func: &Function) -> HashMap<Node, HashSet<String>> {
+    type L = HashSet<String>;
+    let direction = Direction::Backward;
+    let initial_value: L = HashSet::new();
+    let transfer = |x: Node, l: &L| -> L {
+        match x {
+            Node::Entry => l.bot(),
+            Node::Exit => l.bot(),
+            Node::Inst(offset) => {
+                use Instruction::*;
+                if let Code::Instruction(inst) = &func.instrs[offset] {
+                    match inst {
+                        Constant { dest, .. } => {
+                            let mut l = l.clone();
+                            l.remove(dest);
+                            l
+                        }
+                        Value { dest, args, .. } => {
+                            // if dest is in l, then all args are observable
+                            let mut l = l.clone();
+                            if l.contains(dest) {
+                                l.remove(dest);
+                                let gen: HashSet<String> = args.iter().cloned().collect();
+                                l.union(&gen).cloned().collect()
+                            } else {
+                                l
+                            }
+                        }
+                        Effect { args, .. } => {
+                            let gen = args.iter().cloned().collect();
+                            l.union(&gen).cloned().collect()
+                        }
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+    };
+    let analysis = MonotoneFramework {
+        direction,
+        initial_value,
+        transfer,
+    };
+    let cfg = ControlFlowGraph::new(func);
+    analysis.run(&cfg)
+}

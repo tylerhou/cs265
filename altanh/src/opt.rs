@@ -1,4 +1,4 @@
-use crate::monotone::live_variables;
+use crate::monotone::{live_variables, observable_variables};
 use bril_rs::{Code, Function, Instruction};
 
 /// Program optimizations
@@ -8,7 +8,8 @@ use bril_rs::{Code, Function, Instruction};
 /// Dead code elimination.
 /// - Removes instructions that are not used.
 pub fn dce(func: &Function) -> Option<Function> {
-    let lv = live_variables(func);
+    // let lv = live_variables(func);
+    let lv = observable_variables(func);
     let mut new_instrs = vec![];
     let mut did_work = false;
     for (i, instr) in func.instrs.iter().enumerate() {
