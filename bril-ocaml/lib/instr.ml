@@ -236,7 +236,7 @@ let to_json =
     `Assoc
       [
         ("op", `String "ret");
-        ("args", Option.value_map arg ~default:`Null ~f:(fun arg -> `List [ `String arg ]));
+        ("args", Option.value_map arg ~default:(`List []) ~f:(fun arg -> `List [ `String arg ]));
       ]
   | Print args ->
     `Assoc [ ("op", `String "print"); ("args", `List (List.map args ~f:(fun arg -> `String arg))) ]
