@@ -1,4 +1,4 @@
-use bril_rs::{Code, Function, Instruction};
+use bril_rs::{Code, EffectOps, Function, Instruction, Literal, ValueOps};
 
 use crate::cfg::{ControlFlowGraph, Node};
 /// Monotone framework
@@ -79,6 +79,51 @@ where
     }
     fn leq(&self, other: &Self) -> bool {
         self.set.is_superset(&other.set)
+    }
+}
+
+impl<S, T> Semilattice for (S, T)
+where
+    S: Semilattice,
+    T: Semilattice,
+{
+    fn bot(&self) -> Self {
+        (self.0.bot(), self.1.bot())
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        (self.0.join(&other.0), self.1.join(&other.1))
+    }
+
+    fn leq(&self, other: &Self) -> bool {
+        self.0.leq(&other.0) && self.1.leq(&other.1)
+    }
+}
+
+/// Missing keys are treated as bottom.
+impl<K, V> Semilattice for HashMap<K, V>
+where
+    K: Clone + Eq + Hash,
+    V: Semilattice,
+{
+    fn bot(&self) -> Self {
+        HashMap::new()
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        let mut result = self.clone();
+        for (k, v) in other.iter() {
+            result
+                .entry(k.clone())
+                .and_modify(|v2| *v2 = v2.join(v))
+                .or_insert_with(|| v.clone());
+        }
+        result
+    }
+
+    fn leq(&self, other: &Self) -> bool {
+        self.iter()
+            .all(|(k, v)| other.get(k).map_or(false, |v2| v.leq(v2)))
     }
 }
 
@@ -214,5 +259,236 @@ pub fn observable_variables(func: &Function) -> HashMap<Node, HashSet<String>> {
         transfer,
     };
     let cfg = ControlFlowGraph::new(func);
+    analysis.run(&cfg)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ConstantLattice {
+    Bot,
+    Top,
+    Int(i64),
+    Bool(bool),
+}
+
+impl Semilattice for ConstantLattice {
+    fn join(&self, other: &Self) -> Self {
+        use ConstantLattice::*;
+        match (self, other) {
+            (Bot, _) => *other,
+            (_, Bot) => *self,
+            (Top, _) => Top,
+            (_, Top) => Top,
+            (Int(x), Int(y)) => {
+                if x == y {
+                    Int(*x)
+                } else {
+                    Top
+                }
+            }
+            (Bool(x), Bool(y)) => {
+                if x == y {
+                    Bool(*x)
+                } else {
+                    Top
+                }
+            }
+            _ => unreachable!("trying to join incompatible constant types, this is a type error"),
+        }
+    }
+
+    fn bot(&self) -> Self {
+        ConstantLattice::Bot
+    }
+
+    fn leq(&self, other: &Self) -> bool {
+        use ConstantLattice::*;
+        match (self, other) {
+            (Bot, _) => true,
+            (_, Top) => true,
+            (Int(x), Int(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+#[allow(unreachable_patterns)]
+impl From<Literal> for ConstantLattice {
+    fn from(lit: Literal) -> Self {
+        use ConstantLattice::*;
+        match lit {
+            Literal::Int(x) => Int(x),
+            Literal::Bool(x) => Bool(x),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+type ConditionalConstantLattice = (HashMap<String, ConstantLattice>, HashSet<Node>);
+
+fn const_eval(env: &HashMap<String, ConstantLattice>, inst: &Instruction) -> ConstantLattice {
+    use ConstantLattice::*;
+    use Instruction::*;
+    match inst {
+        Constant { value, .. } => value.clone().into(),
+        Value { op, args, .. } => {
+            use ValueOps::*;
+            let args: Vec<ConstantLattice> = args.iter().map(|arg| env[arg]).collect();
+            // check that no arguments are bot
+            if args.iter().any(|arg| arg == &Bot) {
+                panic!("undefined value in instruction {}", inst);
+            }
+            match op {
+                Add => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Int(x + y),
+                    _ => Top,
+                },
+                Sub => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Int(x - y),
+                    _ => Top,
+                },
+                Mul => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Int(x * y),
+                    _ => Top,
+                },
+                Div => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Int(x / y),
+                    _ => Top,
+                },
+                Eq => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Bool(x == y),
+                    _ => Top,
+                },
+                Lt => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Bool(x < y),
+                    _ => Top,
+                },
+                Gt => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Bool(x > y),
+                    _ => Top,
+                },
+                Le => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Bool(x <= y),
+                    _ => Top,
+                },
+                Ge => match (&args[0], &args[1]) {
+                    (Int(x), Int(y)) => Bool(x >= y),
+                    _ => Top,
+                },
+                Not => match &args[0] {
+                    Bool(x) => Bool(!x),
+                    _ => Top,
+                },
+                And => match (&args[0], &args[1]) {
+                    (Bool(false), _) | (_, Bool(false)) => Bool(false),
+                    (Bool(true), Bool(true)) => Bool(true),
+                    _ => Top,
+                },
+                Or => match (&args[0], &args[1]) {
+                    (Bool(true), _) | (_, Bool(true)) => Bool(true),
+                    (Bool(false), Bool(false)) => Bool(false),
+                    _ => Top,
+                },
+                Call => Top,
+                Id => args[0].clone(),
+            }
+        }
+        _ => unreachable!("not an expression"),
+    }
+}
+
+pub fn conditional_constant(func: &Function) -> HashMap<Node, ConditionalConstantLattice> {
+    let cfg = ControlFlowGraph::new(func);
+    // let entry_reachable: HashSet<Node> = cfg.flow[&Node::Entry].iter().cloned().collect();
+    let direction = Direction::Forward;
+    let initial_value = {
+        let mut initial_env: HashMap<String, ConstantLattice> = HashMap::new();
+        // Function arguments get top
+        for arg in &func.args {
+            initial_env.insert(arg.name.clone(), ConstantLattice::Top);
+        }
+        (initial_env, vec![Node::Entry].into_iter().collect())
+    };
+    let transfer = |x: Node, l: &ConditionalConstantLattice| -> ConditionalConstantLattice {
+        let (env, reachable) = l;
+        if reachable.contains(&x) {
+            match x {
+                Node::Entry => {
+                    // all successors are reachable
+                    let mut r = HashSet::new();
+                    for next in &cfg.flow[&x] {
+                        r.insert(*next);
+                    }
+                    (env.clone(), r)
+                }
+                Node::Exit => l.bot(),
+                Node::Inst(offset) => {
+                    use Instruction::*;
+                    if let Code::Instruction(inst) = &func.instrs[offset] {
+                        match inst {
+                            Constant { dest, .. } | Value { dest, .. } => {
+                                let c = const_eval(env, inst);
+                                let mut next_env = env.clone();
+                                next_env.insert(dest.clone(), c);
+                                let mut r = HashSet::new();
+                                // insert successor
+                                for next in &cfg.flow[&x] {
+                                    r.insert(*next);
+                                }
+                                (next_env, r)
+                            }
+                            Effect {
+                                op: EffectOps::Jump,
+                                labels,
+                                ..
+                            } => {
+                                let mut r = HashSet::new();
+                                for label in labels {
+                                    r.insert(cfg.resolve(label));
+                                }
+                                (env.clone(), r)
+                            }
+                            Effect {
+                                op: EffectOps::Branch,
+                                labels,
+                                args,
+                                ..
+                            } => {
+                                // Look up the value of the condition; if it
+                                // hasn't been defined, then we are in undefined behavior.
+                                let cond =
+                                    env.get(&args[0]).cloned().unwrap_or(ConstantLattice::Bot);
+                                let mut r = HashSet::new();
+                                match cond {
+                                    ConstantLattice::Bool(true) => {
+                                        r.insert(cfg.resolve(&labels[0]));
+                                    }
+                                    ConstantLattice::Bool(false) => {
+                                        r.insert(cfg.resolve(&labels[1]));
+                                    }
+                                    ConstantLattice::Top => {
+                                        r.insert(cfg.resolve(&labels[0]));
+                                        r.insert(cfg.resolve(&labels[1]));
+                                    }
+                                    ConstantLattice::Bot => (),
+                                    _ => panic!("condition is not a boolean"),
+                                }
+                                (env.clone(), r)
+                            }
+                            _ => l.clone(),
+                        }
+                    } else {
+                        unreachable!();
+                    }
+                }
+            }
+        } else {
+            l.clone()
+        }
+    };
+    let analysis = MonotoneFramework {
+        direction,
+        initial_value,
+        transfer,
+    };
     analysis.run(&cfg)
 }
