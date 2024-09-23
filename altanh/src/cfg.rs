@@ -23,16 +23,16 @@ pub struct ControlFlowGraph<'a> {
     pub flow: HashMap<Node, HashSet<Node>>,
     pub flow_r: HashMap<Node, HashSet<Node>>,
     pub func: &'a Function,
+    pub labels: HashMap<String, usize>,
 }
 
 impl<'a> ControlFlowGraph<'a> {
     pub fn new(func: &'a Function) -> Self {
-        let label_map = resolve_labels(func);
-
         let mut cfg = ControlFlowGraph {
             flow: HashMap::new(),
             flow_r: HashMap::new(),
             func,
+            labels: resolve_labels(func),
         };
 
         // Find the first instruction
@@ -49,8 +49,8 @@ impl<'a> ControlFlowGraph<'a> {
                         ..
                     } => {
                         for target in labels {
-                            let target: Node = if label_map.contains_key(target) {
-                                label_map[target].into()
+                            let target: Node = if cfg.labels.contains_key(target) {
+                                cfg.labels[target].into()
                             } else {
                                 Node::Exit
                             };
@@ -119,5 +119,13 @@ impl<'a> ControlFlowGraph<'a> {
         }
 
         writeln!(f, "}}")
+    }
+
+    pub fn resolve(&self, label: &str) -> Node {
+        if let Some(index) = self.labels.get(label) {
+            Node::Inst(*index)
+        } else {
+            Node::Exit
+        }
     }
 }
