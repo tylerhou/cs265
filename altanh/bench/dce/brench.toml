@@ -15,7 +15,7 @@ pipeline = [
 [runs.valnum-dce]
 pipeline = [
     "bril2json",
-    "../../../tylerhou_opt/_build/install/default/bin/opt",
+    "../../../tylerhou/_build/install/default/bin/opt",
     "cargo run --manifest-path ../../Cargo.toml",
     "brili -p {args}",
 ]
