@@ -236,7 +236,7 @@ let to_json =
     `Assoc
       [
         ("op", `String "ret");
-        ("args", Option.value_map arg ~default:`Null ~f:(fun arg -> `List [ `String arg ]));
+        ("args", Option.value_map arg ~default:(`List []) ~f:(fun arg -> `List [ `String arg ]));
       ]
   | Print args ->
     `Assoc [ ("op", `String "print"); ("args", `List (List.map args ~f:(fun arg -> `String arg))) ]
@@ -257,5 +257,5 @@ let to_json =
   | Alloc (dest, arg) -> build_op ~op:"alloc" ~args:[ arg ] ~dest ()
   | Free arg -> build_op ~op:"free" ~args:[ arg ] ()
   | Load (dest, arg) -> build_op ~op:"load" ~args:[ arg ] ~dest ()
-  | Store (arg1, arg2) -> build_op ~op:"load" ~args:[ arg1; arg2 ] ()
+  | Store (arg1, arg2) -> build_op ~op:"store" ~args:[ arg1; arg2 ] ()
   | PtrAdd (dest, arg1, arg2) -> build_op ~op:"ptradd" ~args:[ arg1; arg2 ] ~dest ()
