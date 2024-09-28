@@ -45,6 +45,48 @@ module Var = struct
   include Comparable.Make_plain (T)
 end
 
+module With_state = struct
+  module type S = sig
+    include Monad.S
+
+    type state
+
+    val run : 'a t -> state:state -> state * 'a
+    val get : state t
+    val put : state -> unit t
+  end
+
+  module Make (State : sig
+      type t
+    end) : sig
+    module With_state : sig
+      include S with type state := State.t
+    end
+  end = struct
+    module With_state = struct
+      module T = struct
+        type 'a t = State.t -> State.t * 'a
+
+        let run (t : 'a t) ~(state : State.t) : State.t * 'a = t state
+        let get : State.t t = fun state -> state, state
+        let put (state : State.t) : unit t = fun _ -> state, ()
+
+        let bind (t : 'a t) ~(f : 'a -> 'b t) : 'b t =
+          fun state ->
+          let state, a = run t ~state in
+          run (f a) ~state
+        ;;
+
+        let return (type a) (a : a) : a t = fun state -> state, a
+        let map = `Define_using_bind
+      end
+
+      include T
+      include Monad.Make (T)
+    end
+  end
+end
+
 module Numbering : sig
   (* Invariants:
 
@@ -53,20 +95,23 @@ module Numbering : sig
   *)
   type t
 
+  module With_state : With_state.S with type state := t
+
   val empty : t
   val of_var : t -> Var.t -> Number.t option
+  val to_instr : t -> Bril.Dest.t -> Number.t -> Bril.Instr.t
 
-  val number_instr
-    :  t
-    -> Bril.Instr.t
-    -> t
-       * [ `Cannot_number
+  module Stateful : sig
+    val number_instr
+      :  Bril.Instr.t
+      -> [ `Cannot_number
          | `New_expression of Bril.Dest.t * Number.t
          | `Available_expression of Bril.Dest.t * Number.t
          ]
+           With_state.t
 
-  val to_instr : t -> Bril.Dest.t -> Number.t -> Bril.Instr.t
-  val clobber : t -> Number.t -> t
+    val clobber : Number.t -> unit With_state.t
+  end
 end = struct
   module Expr = struct
     module T = struct
@@ -81,14 +126,19 @@ end = struct
     include Comparable.Make_plain (T)
   end
 
-  type t =
-    { number_by_var : Number.t Var.Map.t
-    ; var_by_number : Var.t Number.Map.t
-    ; number_by_expr : Number.t Expr.Map.t
-    ; rdeps_by_number : Number.t list Number.Map.t
-    ; simplified_by_number : Expr.t Number.Map.t
-    ; next_number : Number.t
-    }
+  module T = struct
+    type t =
+      { number_by_var : Number.t Var.Map.t
+      ; var_by_number : Var.t Number.Map.t
+      ; number_by_expr : Number.t Expr.Map.t
+      ; rdeps_by_number : Number.t list Number.Map.t
+      ; simplified_by_number : Expr.t Number.Map.t
+      ; next_number : Number.t
+      }
+  end
+
+  include T
+  include With_state.Make (T)
 
   let empty =
     { number_by_var = Var.Map.empty
@@ -107,54 +157,6 @@ end = struct
 
   let to_var (t : t) (num : Number.t) = Map.find_exn t.var_by_number num
   let of_var (t : t) (var : Var.t) = Map.find t.number_by_var var
-  let fresh_num t = { t with next_number = Number.succ t.next_number }, t.next_number
-
-  let number_var (t : t) (var : Var.t) =
-    match Map.find t.number_by_var var with
-    | Some number -> t, number
-    | None ->
-      let t, number = fresh_num t in
-      let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
-      let var_by_number = Map.set t.var_by_number ~key:number ~data:var in
-      { t with number_by_var; var_by_number }, number
-  ;;
-
-  let number_expr (t : t) (var : Var.t) (expr : Expr.t) =
-    match Map.find t.number_by_expr expr with
-    | Some number ->
-      let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
-      { t with number_by_var }, `Available_expression number
-    | None ->
-      let t, number = fresh_num t in
-      let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
-      let var_by_number = Map.set t.var_by_number ~key:number ~data:var in
-      let number_by_expr = Map.set t.number_by_expr ~key:expr ~data:number in
-      let rdeps_by_number =
-        match expr with
-        | Const _ -> t.rdeps_by_number
-        | Unary (_, var) -> t.rdeps_by_number |> Map.add_multi ~key:var ~data:number
-        | Binary (_, left, right) ->
-          t.rdeps_by_number
-          |> Map.add_multi ~key:left ~data:number
-          |> Map.add_multi ~key:right ~data:number
-      in
-      ( { t with number_by_var; var_by_number; number_by_expr; rdeps_by_number }
-      , `New_expression number )
-  ;;
-
-  let clobber (t : t) (dest : Number.t) =
-    let rec find_deps (num : Number.t) : Number.t list =
-      num :: (Map.find_multi t.rdeps_by_number num |> List.map ~f:find_deps |> List.concat)
-    in
-    let deps = find_deps dest |> Number.Set.of_list in
-    eprint_s [%message "Clobbering" (deps |> Set.to_list : Number.t list)];
-    let keep number = not (Set.mem deps number) in
-    let number_by_var = Map.filter t.number_by_var ~f:keep in
-    let var_by_number = Map.filter_keys t.var_by_number ~f:keep in
-    let number_by_expr = Map.filter t.number_by_expr ~f:keep in
-    let rdeps_by_number = Map.filter_keys t.rdeps_by_number ~f:keep in
-    { t with number_by_var; var_by_number; number_by_expr; rdeps_by_number }
-  ;;
 
   let to_instr (t : t) (dest : Bril.Dest.t) (num : Number.t) : Bril.Instr.t =
     let to_var n = to_var t n in
@@ -232,75 +234,175 @@ end = struct
     expr
   ;;
 
-  let simplify_and_add_expr (t : t) (num : Number.t) (expr : Expr.t) =
-    let expr = simplify_expr t expr in
-    let simplified_by_number = Map.add_exn t.simplified_by_number ~key:num ~data:expr in
-    { t with simplified_by_number }
-  ;;
+  module Stateful = struct
+    open With_state.Let_syntax
 
-  let expr_of_ins (t : t) (ins : Bril.Instr.t) : t * (Bril.Dest.t * Expr.t) option =
-    let of_var t v =
-      match of_var t v with
-      | Some num -> t, num
-      | None -> number_var t v
-    in
-    match ins with
-    | Const (dest, const) -> t, Some (dest, Const const)
-    | Unary (dest, op, var) ->
-      let t, var = of_var t var in
-      t, Some (dest, Unary (op, var))
-    | Binary (dest, op, left, right) ->
-      let t, left = of_var t left in
-      let t, right = of_var t right in
-      t, Some (dest, Binary (op, left, right))
-    | _ -> t, None
-  ;;
+    let fresh_num : Number.t With_state.t =
+      let%bind t = With_state.get in
+      let%bind () = With_state.put { t with next_number = Number.succ t.next_number } in
+      return t.next_number
+    ;;
 
-  let number_instr (t : t) (instr : Bril.Instr.t)
-    : t
-      * [ `Cannot_number
+    let number_var (var : Var.t) : Number.t With_state.t =
+      match%bind
+        let%map t = With_state.get in
+        Map.find t.number_by_var var
+      with
+      | Some number -> return number
+      | None ->
+        let%bind number = fresh_num in
+        let%bind () =
+          let%bind t = With_state.get in
+          let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
+          let var_by_number = Map.set t.var_by_number ~key:number ~data:var in
+          With_state.put { t with number_by_var; var_by_number }
+        in
+        return number
+    ;;
+
+    let number_expr (var : Var.t) (expr : Expr.t) =
+      match%bind
+        let%map t = With_state.get in
+        Map.find t.number_by_expr expr
+      with
+      | Some number ->
+        let%bind () =
+          let%bind t = With_state.get in
+          let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
+          With_state.put { t with number_by_var }
+        in
+        return (`Available_expression number)
+      | None ->
+        let%bind number = fresh_num in
+        let%bind () =
+          let%bind t = With_state.get in
+          let number_by_var = Map.set t.number_by_var ~key:var ~data:number in
+          let var_by_number = Map.set t.var_by_number ~key:number ~data:var in
+          let number_by_expr = Map.set t.number_by_expr ~key:expr ~data:number in
+          let rdeps_by_number =
+            match expr with
+            | Const _ -> t.rdeps_by_number
+            | Unary (_, var) -> t.rdeps_by_number |> Map.add_multi ~key:var ~data:number
+            | Binary (_, left, right) ->
+              t.rdeps_by_number
+              |> Map.add_multi ~key:left ~data:number
+              |> Map.add_multi ~key:right ~data:number
+          in
+          With_state.put
+            { t with number_by_var; var_by_number; number_by_expr; rdeps_by_number }
+        in
+        return (`New_expression number)
+    ;;
+
+    let clobber (dest : Number.t) : unit With_state.t =
+      let%bind deps =
+        let%map t = With_state.get in
+        let rec find_deps (num : Number.t) : Number.t list =
+          num
+          :: (Map.find_multi t.rdeps_by_number num |> List.map ~f:find_deps |> List.concat)
+        in
+        find_deps dest |> Number.Set.of_list
+      in
+      eprint_s [%message "Clobbering" (deps |> Set.to_list : Number.t list)];
+      let keep number = not (Set.mem deps number) in
+      let%bind () =
+        let%bind t = With_state.get in
+        let number_by_var = Map.filter t.number_by_var ~f:keep in
+        let var_by_number = Map.filter_keys t.var_by_number ~f:keep in
+        let number_by_expr = Map.filter t.number_by_expr ~f:keep in
+        let rdeps_by_number = Map.filter_keys t.rdeps_by_number ~f:keep in
+        With_state.put
+          { t with number_by_var; var_by_number; number_by_expr; rdeps_by_number }
+      in
+      return ()
+    ;;
+
+    let simplify_and_add_expr (num : Number.t) (expr : Expr.t) : unit With_state.t =
+      let%bind expr =
+        let%map t = With_state.get in
+         simplify_expr t expr
+      in
+      let%bind () =
+        let%bind t = With_state.get in
+        let simplified_by_number =
+          Map.add_exn t.simplified_by_number ~key:num ~data:expr
+        in
+        With_state.put { t with simplified_by_number }
+      in
+      return ()
+    ;;
+
+    let expr_of_ins (ins : Bril.Instr.t) : (Bril.Dest.t * Expr.t) option With_state.t =
+      let of_var v =
+        let%bind t = With_state.get in
+        match of_var t v with
+        | Some num -> return num
+        | None -> number_var v
+      in
+      match ins with
+      | Const (dest, const) -> return (Some (dest, Expr.Const const))
+      | Unary (dest, op, var) ->
+        let%bind var = of_var var in
+        return (Some (dest, Expr.Unary (op, var)))
+      | Binary (dest, op, left, right) ->
+        let%bind left = of_var left in
+        let%bind right = of_var right in
+        return (Some (dest, Expr.Binary (op, left, right)))
+      | _ -> return None
+    ;;
+
+    let number_instr (instr : Bril.Instr.t)
+      : [ `Cannot_number
         | `New_expression of Bril.Dest.t * Number.t
         | `Available_expression of Bril.Dest.t * Number.t
         ]
-    =
-    match expr_of_ins t instr with
-    | t, None -> t, `Cannot_number
-    | t, Some (((dest_var, _) as dest), expr) ->
-      let t, result = number_expr t dest_var expr in
-      (match result with
-       | `New_expression number ->
-         let t = simplify_and_add_expr t number expr in
-         t, `New_expression (dest, number)
-       | `Available_expression number -> t, `Available_expression (dest, number))
-  ;;
+          With_state.t
+      =
+      match%bind expr_of_ins instr with
+      | None -> return `Cannot_number
+      | Some (((dest_var, _) as dest), expr) ->
+        let%bind result = number_expr dest_var expr in
+        (match result with
+         | `New_expression number ->
+           let%bind () = simplify_and_add_expr number expr in
+           return (`New_expression (dest, number))
+         | `Available_expression number -> return (`Available_expression (dest, number)))
+    ;;
+  end
 end
 
 let run (fn : Bril.Func.t) =
+  let open Numbering.With_state.Let_syntax in
   eprintf "\n";
   let run_block (block : Bril.Instr.t list) =
     let _, rev_instrs =
-      List.fold block ~init:(Numbering.empty, []) ~f:(fun (numbering, instrs) instr ->
+      List.fold block ~init:(Numbering.With_state.return []) ~f:(fun instrs instr ->
         eprint_s [%message "Processing instruction" (instr : Bril.Instr.t)];
-        let to_clobber =
+        let%bind instrs = instrs in
+        let%bind to_clobber =
           match Bril.Instr.dest instr with
-          | Some (dest_var, _) -> Numbering.of_var numbering dest_var
-          | None -> None
+          | Some (dest_var, _) ->
+            let%bind numbering = Numbering.With_state.get in
+            return (Numbering.of_var numbering dest_var)
+          | None -> return None
         in
-        let numbering, number = Numbering.number_instr numbering instr in
-        let instr =
+        let%bind number = Numbering.Stateful.number_instr instr in
+        let%bind instr =
           match number with
-          | `Cannot_number -> instr
+          | `Cannot_number -> return instr
           | `New_expression (dest, number) | `Available_expression (dest, number) ->
-            Numbering.to_instr numbering dest number
+            let%bind numbering = Numbering.With_state.get in
+            return (Numbering.to_instr numbering dest number)
         in
         let instrs = instr :: instrs in
-        let numbering =
+        let%bind () =
           match to_clobber with
-          | Some old_dest_number -> Numbering.clobber numbering old_dest_number
-          | None -> numbering
+          | Some old_dest_number -> Numbering.Stateful.clobber old_dest_number
+          | None -> return ()
         in
         eprintf "\n";
-        numbering, instrs)
+        return instrs)
+      |> Numbering.With_state.run ~state:Numbering.empty
     in
     rev_instrs |> List.rev
   in
