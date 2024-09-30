@@ -38,8 +38,8 @@ module Make (Transfer : Transfer) = struct
          | `Backwards -> func.succs)
     ; succs =
         (match Transfer.direction with
-         | `Forwards -> func.preds
-         | `Backwards -> func.succs)
+         | `Forwards -> func.succs
+         | `Backwards -> func.preds)
     }
   ;;
 
@@ -81,11 +81,19 @@ module Make (Transfer : Transfer) = struct
     match t.worklist with
     | [] -> `Done t.blocks
     | label :: rest ->
+      eprint_s [%message "processing" (label : string)];
       let block = Map.find_exn t.blocks label in
       let updated = run_block label block in
       let blocks = Map.set t.blocks ~key:label ~data:updated in
       let worklist =
-        if Block.equal block updated then rest else rest @ successors t label
+        if Block.equal block updated
+        then (
+          eprint_s [%message "reached fixpoint" (label : string)];
+          rest)
+        else (
+          let adding = successors t label in
+          eprint_s [%message "adding to worklist" (label : string) (adding : string list)];
+          rest @ adding)
       in
       `Keep_going { t with worklist; blocks }
   ;;
