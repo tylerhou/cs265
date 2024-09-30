@@ -82,18 +82,24 @@ module Make (Transfer : Transfer) = struct
     | [] -> `Done t.blocks
     | label :: rest ->
       eprint_s [%message "processing" (label : string)];
-      let block = Map.find_exn t.blocks label in
-      let updated = run_block label block in
-      let blocks = Map.set t.blocks ~key:label ~data:updated in
+      let before = Map.find_exn t.blocks label in
+      let after = run_block label before in
+      let blocks = Map.set t.blocks ~key:label ~data:after in
       let worklist =
-        if Block.equal block updated
+        (* We just ran the analysis on label, remove instances of it from the
+           rest of the list. Make sure to do this before we append, to avoid
+           self-cycles. *)
+        let without_label =
+          List.filter rest ~f:(fun other -> not (String.equal label other))
+        in
+        if Block.equal before after
         then (
           eprint_s [%message "reached fixpoint" (label : string)];
-          rest)
+          without_label)
         else (
           let adding = successors t label in
           eprint_s [%message "adding to worklist" (label : string) (adding : string list)];
-          rest @ adding)
+          without_label @ adding)
       in
       `Keep_going { t with worklist; blocks }
   ;;
