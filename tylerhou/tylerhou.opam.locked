@@ -14,9 +14,12 @@ depends: [
   "bril" {= "1.2.0" & ?vendor}
   "capitalization" {= "v0.17.0" & ?vendor}
   "core" {= "v0.17.1" & ?vendor}
+  "core_kernel" {= "v0.17.0" & ?vendor}
+  "core_unix" {= "v0.17.0" & ?vendor}
   "csexp" {= "1.5.2" & ?vendor}
   "dune" {= "3.16.0"}
   "dune-configurator" {= "3.16.0" & ?vendor}
+  "expect_test_helpers_core" {= "v0.17.0" & ?vendor}
   "fieldslib" {= "v0.17.0" & ?vendor}
   "gel" {= "v0.17.0" & ?vendor}
   "host-arch-arm64" {= "1"}
@@ -70,17 +73,23 @@ depends: [
   "ppx_variants_conv" {= "v0.17.0" & ?vendor}
   "ppxlib" {= "0.33.0" & ?vendor}
   "ppxlib_jane" {= "v0.17.0" & ?vendor}
+  "re" {= "1.12.0" & ?vendor}
   "seq" {= "base+dune" & ?vendor}
+  "sexp_pretty" {= "v0.17.0" & ?vendor}
   "sexplib" {= "v0.17.0" & ?vendor}
   "sexplib0" {= "v0.17.0" & ?vendor}
+  "spawn" {= "v0.15.1" & ?vendor}
   "splittable_random" {= "v0.17.0" & ?vendor}
   "stdio" {= "v0.17.0" & ?vendor}
   "stdlib-shims" {= "0.3.0" & ?vendor}
   "time_now" {= "v0.17.0" & ?vendor}
+  "timezone" {= "v0.17.0" & ?vendor}
   "typerep" {= "v0.17.0" & ?vendor}
+  "uopt" {= "v0.17.0" & ?vendor}
   "variantslib" {= "v0.17.0" & ?vendor}
   "yojson" {= "2.2.2" & ?vendor}
 ]
+depexts: ["linux-headers"] {os-family = "alpine"}
 pin-depends: [
   [
     "base.v0.17.1"
@@ -108,12 +117,24 @@ pin-depends: [
     "https://github.com/janestreet/core/archive/refs/tags/v0.17.1.tar.gz"
   ]
   [
+    "core_kernel.v0.17.0"
+    "https://github.com/janestreet/core_kernel/archive/refs/tags/v0.17.0.tar.gz"
+  ]
+  [
+    "core_unix.v0.17.0"
+    "https://github.com/janestreet/core_unix/archive/refs/tags/v0.17.0.tar.gz"
+  ]
+  [
     "csexp.1.5.2"
     "https://github.com/ocaml-dune/csexp/releases/download/1.5.2/csexp-1.5.2.tbz"
   ]
   [
     "dune-configurator.3.16.0"
     "https://github.com/ocaml/dune/releases/download/3.16.0/dune-3.16.0.tbz"
+  ]
+  [
+    "expect_test_helpers_core.v0.17.0"
+    "https://github.com/janestreet/expect_test_helpers_core/archive/refs/tags/v0.17.0.tar.gz"
   ]
   [
     "fieldslib.v0.17.0"
@@ -303,7 +324,15 @@ pin-depends: [
     "ppxlib_jane.v0.17.0"
     "https://github.com/janestreet/ppxlib_jane/archive/refs/tags/v0.17.0.tar.gz"
   ]
+  [
+    "re.1.12.0"
+    "https://github.com/ocaml/ocaml-re/releases/download/1.12.0/re-1.12.0.tbz"
+  ]
   ["seq.base+dune" "https://github.com/c-cube/seq/archive/0.2.2.tar.gz"]
+  [
+    "sexp_pretty.v0.17.0"
+    "https://github.com/janestreet/sexp_pretty/archive/refs/tags/v0.17.0.tar.gz"
+  ]
   [
     "sexplib.v0.17.0"
     "https://github.com/janestreet/sexplib/archive/refs/tags/v0.17.0.tar.gz"
@@ -311,6 +340,10 @@ pin-depends: [
   [
     "sexplib0.v0.17.0"
     "https://github.com/janestreet/sexplib0/archive/refs/tags/v0.17.0.tar.gz"
+  ]
+  [
+    "spawn.v0.15.1"
+    "https://github.com/janestreet/spawn/archive/v0.15.1.tar.gz"
   ]
   [
     "splittable_random.v0.17.0"
@@ -329,8 +362,16 @@ pin-depends: [
     "https://github.com/janestreet/time_now/archive/refs/tags/v0.17.0.tar.gz"
   ]
   [
+    "timezone.v0.17.0"
+    "https://github.com/janestreet/timezone/archive/refs/tags/v0.17.0.tar.gz"
+  ]
+  [
     "typerep.v0.17.0"
     "https://github.com/janestreet/typerep/archive/refs/tags/v0.17.0.tar.gz"
+  ]
+  [
+    "uopt.v0.17.0"
+    "https://github.com/janestreet/uopt/archive/refs/tags/v0.17.0.tar.gz"
   ]
   [
     "variantslib.v0.17.0"
@@ -401,6 +442,27 @@ x-opam-monorepo-duniverse-dirs: [
     [
       "md5=743a141234e04210e295980f7a78a6d9"
       "sha512=61b415f4fb12c78d30649fff1aabe3a475eea926ce6edb7774031f4dc7f37ea51f5d9337ead6ec73cd93da5fd1ed0f2738c210c71ebc8fe9d7f6135a06bd176f"
+    ]
+  ]
+  [
+    "https://github.com/janestreet/core_kernel/archive/refs/tags/v0.17.0.tar.gz"
+    "core_kernel"
+    [
+      "sha256=fd2b8c6715794df7a810a62b226f53720f211cd344b4afc9fab0498796d6b466"
+    ]
+  ]
+  [
+    "https://github.com/janestreet/core_unix/archive/refs/tags/v0.17.0.tar.gz"
+    "core_unix"
+    [
+      "sha256=175025e240ed90647d817b1af5e4174bf146505903ed671e645f8a5d5f497182"
+    ]
+  ]
+  [
+    "https://github.com/janestreet/expect_test_helpers_core/archive/refs/tags/v0.17.0.tar.gz"
+    "expect_test_helpers_core"
+    [
+      "sha256=c8380970589385b459413824ea3b2c959ed0a6600fe088f56eda0e16070880bf"
     ]
   ]
   [
@@ -714,6 +776,13 @@ x-opam-monorepo-duniverse-dirs: [
     ]
   ]
   [
+    "https://github.com/janestreet/sexp_pretty/archive/refs/tags/v0.17.0.tar.gz"
+    "sexp_pretty"
+    [
+      "sha256=48caa552235e331f349a70580e756cea0d8335d9cccc46f3fe47142e04bad2f8"
+    ]
+  ]
+  [
     "https://github.com/janestreet/sexplib/archive/refs/tags/v0.17.0.tar.gz"
     "sexplib"
     [
@@ -726,6 +795,14 @@ x-opam-monorepo-duniverse-dirs: [
     [
       "md5=abafe8fd1d6302e55a315f4d78960d2a"
       "sha512=ad387e40789fe70a11473db7e85fe017b801592624414e9030730b2e92ea08f98095fb6e9236430f33c801605ebee0a2a6284e0f618a26a7da4599d4fd9d395d"
+    ]
+  ]
+  [
+    "https://github.com/janestreet/spawn/archive/v0.15.1.tar.gz"
+    "spawn"
+    [
+      "sha256=9afdee314fab6c3fcd689ab6eb5608d6b78078e6dede3953a47debde06c19d50"
+      "sha512=efdb31d5ec5ea36d0bc80224d4ee04e46ce3428d1662870e6cebece92bc313d6eebee378802c0c059dd6e0cafea515308c31b7dfaf04a098eb4566583c1e9ed4"
     ]
   ]
   [
@@ -750,10 +827,24 @@ x-opam-monorepo-duniverse-dirs: [
     ]
   ]
   [
+    "https://github.com/janestreet/timezone/archive/refs/tags/v0.17.0.tar.gz"
+    "timezone"
+    [
+      "sha256=43026ee35551b996c627b0759e20da1a01609a3fd999eb6ba3149632dd625adf"
+    ]
+  ]
+  [
     "https://github.com/janestreet/typerep/archive/refs/tags/v0.17.0.tar.gz"
     "typerep"
     [
       "sha256=ff8268f46f447bbc95dac29a50f465625646b213e3a9638f4d773b9e17b650e8"
+    ]
+  ]
+  [
+    "https://github.com/janestreet/uopt/archive/refs/tags/v0.17.0.tar.gz"
+    "uopt"
+    [
+      "sha256=a6534df59d54cfa50ac22c4406d425b098e94b198cee48c3d82e15a348577cc6"
     ]
   ]
   [
@@ -801,6 +892,14 @@ x-opam-monorepo-duniverse-dirs: [
     [
       "sha256=5481dde7918ca3121e02c34d74339f734b32d5883efb8c1b8056471e74f9bda6"
       "sha512=529f937c61bc9ea7b135c2425f2d730478b48e6ab6b6455c354138d27b76bd43afce40d4784a6f183d6308d3cf0f5d5cea5bea070f83442949762ed818fb44bc"
+    ]
+  ]
+  [
+    "https://github.com/ocaml/ocaml-re/releases/download/1.12.0/re-1.12.0.tbz"
+    "ocaml-re"
+    [
+      "sha256=a01f2bf22f72c2f4ababd8d3e7635e35c1bf6bc5a41ad6d5a007454ddabad1d4"
+      "sha512=f0726826e1e677f7ecdf447d46d814a11d3844ec6e5c0527be8c73c7afdb08aacfca47ea764eda325bcd7064aff07c1d3441c935ee5a0fc99ede8707f81a451d"
     ]
   ]
   [

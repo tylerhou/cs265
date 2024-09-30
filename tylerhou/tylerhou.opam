@@ -4,6 +4,7 @@ depends: [
   "ocaml"
   "dune" {>= "3.16"}
   "core"
+  "core_unix"
   "ppx_jane"
   "bril"
   "odoc" {with-doc}

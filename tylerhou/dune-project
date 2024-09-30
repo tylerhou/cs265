@@ -6,6 +6,6 @@
 
 (package
  (name tylerhou)
- (depends ocaml dune core ppx_jane bril))
+ (depends ocaml dune core core_unix ppx_jane bril))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

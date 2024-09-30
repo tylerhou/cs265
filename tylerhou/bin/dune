@@ -1,4 +1,6 @@
 (executable
  (public_name opt)
  (name main)
- (libraries opt))
+ (libraries opt core core_unix.command_unix)
+ (preprocess
+  (pps ppx_jane)))
