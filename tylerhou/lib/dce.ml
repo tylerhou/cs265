@@ -13,6 +13,11 @@ module Live_vars = struct
   type t = Var.Set.t [@@deriving compare, equal, sexp_of]
 
   let join (t1 : t) (t2 : t) : t = Set.union t1 t2
+  let bottom : t = Var.Set.empty
+end
+
+module Transfer = struct
+  module Lattice = Live_vars
 
   let is_root (instr : Bril.Instr.t) =
     match instr with
@@ -37,20 +42,20 @@ module Live_vars = struct
     | PtrAdd _ -> false
   ;;
 
-  let transfer (t : t) (instr : Bril.Instr.t) : t =
+  let transfer (live : Live_vars.t) (instr : Bril.Instr.t) : Live_vars.t =
     let dest = Bril.Instr.dest instr in
     let will_args_be_used =
       let will_dest_be_used =
         match dest with
         | None -> false
-        | Some (dest, _) -> Set.mem t dest
+        | Some (dest, _) -> Set.mem live dest
       in
       will_dest_be_used || is_root instr
     in
     let after_kill =
       match dest with
-      | None -> t
-      | Some (dest, _) -> Set.remove t dest
+      | None -> live
+      | Some (dest, _) -> Set.remove live dest
     in
     if will_args_be_used
     then
@@ -64,102 +69,31 @@ module Live_vars = struct
     else after_kill
   ;;
 
-  (* Upwards analysis *)
-  let bottom : t = Var.Set.empty
+  let direction = `Backwards
 end
 
-module Block_with_analysis = struct
-  type t =
-    { block_begin : Live_vars.t
-        (* The state before (after) the first (last) instruction in a forward (backward) analysis *)
-    ; instructions : (Bril.Instr.t * Live_vars.t) list
-        (* An instruction and the state before (after) the instruction executes in a forward (backward) analysis *)
-    ; block_end : Live_vars.t
-    (* The state after (before) the last (first) instruction in a forward (backward) analysis *)
-    }
-  [@@deriving compare, equal, sexp_of]
-end
-
-module State = struct
-  type t =
-    { worklist : string list
-    ; blocks : Block_with_analysis.t String.Map.t
-    ; edges : string list String.Map.t
-    }
-  [@@deriving sexp_of]
-
-  (* List.rev since backwards *)
-  let of_func (func : Bril.Func.t) =
-    { worklist = List.rev func.order
-    ; blocks =
-        Map.map func.blocks ~f:(fun instrs : Block_with_analysis.t ->
-          { block_begin = Live_vars.bottom
-          ; instructions = List.map instrs ~f:(fun ins -> ins, Live_vars.bottom)
-          ; block_end = Live_vars.bottom
-          })
-    ; edges = func.succs
-    }
-  ;;
-
-  let update_one (t : t) : [ `Keep_going of t | `Done of t ] =
-    let predecessors (label : string) = Map.find_exn t.edges label in
-    let run_block (label : string) (block : Block_with_analysis.t) : Block_with_analysis.t
-      =
-      let block_begin =
-        let pred_analyses =
-          predecessors label
-          |> List.map ~f:(fun pred -> (Map.find_exn t.blocks pred).block_end)
-        in
-        pred_analyses |> List.fold ~init:Live_vars.bottom ~f:Live_vars.join
-      in
-      let block_end, instructions =
-        List.fold
-          (List.rev block.instructions)
-          ~init:(block_begin, [])
-          ~f:(fun (analysis, instrs) (instr, _) ->
-            (* eprint_s [%message "before transfer" (analysis : Live_vars.t)]; *)
-            (* eprint_s [%message "    " (instr : Bril.Instr.t)]; *)
-            let analysis = Live_vars.transfer analysis instr in
-            (* eprint_s [%message "after transfer" (analysis : Live_vars.t)]; *)
-            analysis, (instr, analysis) :: instrs)
-      in
-      { block_begin; instructions; block_end }
-    in
-    match t.worklist with
-    | [] -> `Done t
-    | label :: rest ->
-      let block = Map.find_exn t.blocks label in
-      let updated = run_block label block in
-      let blocks = Map.set t.blocks ~key:label ~data:updated in
-      let worklist =
-        if Block_with_analysis.equal block updated
-        then rest
-        else rest @ predecessors label
-      in
-      `Keep_going { t with worklist; blocks }
-  ;;
-end
+module Analyze_live_vars = Dataflow.Make (Transfer)
 
 let run func =
-  let rec loop (state : State.t) =
-    match State.update_one state with
+  let rec loop (state : Analyze_live_vars.t) =
+    match Analyze_live_vars.update_one state with
     | `Done state -> state
     | `Keep_going state -> loop state
   in
-  let analysis = loop (State.of_func func) in
+  let blocks = loop (Analyze_live_vars.of_func func) in
   let optimized_instrs =
     List.concat_map func.order ~f:(fun label ->
-      let analysis = Map.find_exn analysis.blocks label in
+      let block = Map.find_exn blocks label in
       let instrs, _ =
         List.fold
-          (List.rev analysis.instructions)
-          ~init:([], analysis.block_begin)
+          (List.rev block.instructions)
+          ~init:([], block.block_begin)
           ~f:(fun (output, live) (instr, next_live) ->
             eprint_s
               [%message
                 (instr : Bril.Instr.t) (live : Live_vars.t) (next_live : Live_vars.t)];
             let opt_instr =
-              if Live_vars.is_root instr
+              if Transfer.is_root instr
               then Some instr
               else (
                 match Bril.Instr.dest instr with
@@ -175,6 +109,6 @@ let run func =
       in
       instrs)
   in
-  eprint_s [%message "" (analysis : State.t)];
+  eprint_s [%message "" (blocks : Analyze_live_vars.Block.t String.Map.t)];
   Bril.Func.set_instrs func optimized_instrs
 ;;
