@@ -84,28 +84,15 @@ let run func =
   let optimized_instrs =
     List.concat_map func.order ~f:(fun label ->
       let block = Map.find_exn blocks label in
-      let instrs, _ =
-        List.fold
-          (List.rev block.instructions)
-          ~init:([], block.block_begin)
-          ~f:(fun (output, live) (instr, next_live) ->
-            eprint_s
-              [%message
-                (instr : Bril.Instr.t) (live : Live_vars.t) (next_live : Live_vars.t)];
-            let opt_instr =
-              if Transfer.is_root instr
-              then Some instr
-              else (
-                match Bril.Instr.dest instr with
-                | None -> None
-                | Some (dest, _) -> if Set.mem live dest then Some instr else None)
-            in
-            let output =
-              match opt_instr with
-              | Some opt_instr -> opt_instr :: output
-              | None -> output
-            in
-            output, next_live)
+      let instrs =
+        List.filter_map block.instructions ~f:(fun (instr, live) ->
+          eprint_s [%message (instr : Bril.Instr.t) (live : Live_vars.t)];
+          if Transfer.is_root instr
+          then Some instr
+          else (
+            match Bril.Instr.dest instr with
+            | None -> None
+            | Some (dest, _) -> if Set.mem live dest then Some instr else None))
       in
       instrs)
   in

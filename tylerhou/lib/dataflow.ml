@@ -6,9 +6,7 @@ module Make (Transfer : Transfer) = struct
 
   module Block = struct
     type t =
-      { block_begin : Lattice.t
-          (* The state before (after) the first (last) instruction in a forward (backward) analysis *)
-      ; instructions : (Bril.Instr.t * Lattice.t) list
+      { instructions : (Bril.Instr.t * Lattice.t) list
           (* An instruction and the state before (after) the instruction executes in a forward (backward) analysis *)
       ; block_end : Lattice.t
       (* The state after (before) the last (first) instruction in a forward (backward) analysis *)
@@ -31,8 +29,7 @@ module Make (Transfer : Transfer) = struct
          | `Backwards -> List.rev func.order)
     ; blocks =
         Map.map func.blocks ~f:(fun instrs : Block.t ->
-          { block_begin = Lattice.bottom
-          ; instructions = List.map instrs ~f:(fun ins -> ins, Lattice.bottom)
+          { instructions = List.map instrs ~f:(fun ins -> ins, Lattice.bottom)
           ; block_end = Lattice.bottom
           })
     ; preds =
@@ -72,14 +69,14 @@ module Make (Transfer : Transfer) = struct
         fold_instructions
           block.instructions
           ~init:(block_begin, [])
-          ~f:(fun (analysis, instrs) (instr, _) ->
-            (* eprint_s [%message "before transfer" (analysis : Lattice.t)]; *)
+          ~f:(fun (before, instrs) (instr, _) ->
+            (* eprint_s [%message "before transfer" (before : Lattice.t)]; *)
             (* eprint_s [%message "    " (instr : Bril.Instr.t)]; *)
-            let analysis = Transfer.transfer analysis instr in
-            (* eprint_s [%message "after transfer" (analysis : Lattice.t)]; *)
-            analysis, (instr, analysis) :: instrs)
+            let after = Transfer.transfer before instr in
+            (* eprint_s [%message "after transfer" (after : Lattice.t)]; *)
+            after, (instr, before) :: instrs)
       in
-      { block_begin; instructions; block_end }
+      { instructions; block_end }
     in
     match t.worklist with
     | [] -> `Done t.blocks

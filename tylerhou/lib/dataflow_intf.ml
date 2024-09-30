@@ -22,13 +22,12 @@ module type Intf = sig
 
     module Block : sig
       type t =
-        { block_begin : Transfer.Lattice.t
-            (* The state before (after) the first (last) instruction in a forward (backward) analysis *)
-        ; instructions : (Bril.Instr.t * Transfer.Lattice.t) list
-            (* An instruction and the state before (after) the instruction executes in a forward (backward) analysis *)
+        { instructions : (Bril.Instr.t * Transfer.Lattice.t) list
+            (* An instruction and the lattice before the transfer function has run. *)
         ; block_end : Transfer.Lattice.t
         (* The state after (before) the last (first) instruction in a forward (backward) analysis *)
-        } [@@deriving compare, equal, sexp_of]
+        }
+      [@@deriving compare, equal, sexp_of]
     end
 
     val of_func : Bril.Func.t -> t
