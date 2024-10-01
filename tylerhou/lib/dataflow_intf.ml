@@ -16,6 +16,7 @@ end
 
 module type Intf = sig
   module type Lattice = Lattice
+  module type Transfer = Transfer
 
   module Make (Transfer : Transfer) : sig
     type t

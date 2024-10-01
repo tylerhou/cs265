@@ -1,14 +1,5 @@
 open! Core
 
-module Var = struct
-  module T = struct
-    type t = string [@@deriving compare, sexp_of]
-  end
-
-  include T
-  include Comparable.Make_plain (T)
-end
-
 module Live_vars = struct
   type t = Var.Set.t [@@deriving compare, equal, sexp_of]
 
