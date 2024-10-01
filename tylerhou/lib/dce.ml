@@ -66,24 +66,22 @@ end
 module Analyze_live_vars = Dataflow.Make (Transfer)
 
 let run func =
-  let rec loop (state : Analyze_live_vars.t) =
-    match Analyze_live_vars.update_one state with
-    | `Done state -> state
-    | `Keep_going state -> loop state
-  in
-  let blocks = loop (Analyze_live_vars.of_func func) in
+  let blocks = Analyze_live_vars.run func in
   let optimized_instrs =
     List.concat_map func.order ~f:(fun label ->
       let block = Map.find_exn blocks label in
+      let module Block = Analyze_live_vars.Block in
       let instrs =
-        List.filter_map block.instructions ~f:(fun (instr, live) ->
-          eprint_s [%message (instr : Bril.Instr.t) (live : Live_vars.t)];
-          if Transfer.is_root instr
-          then Some instr
-          else (
-            match Bril.Instr.dest instr with
-            | None -> None
-            | Some (dest, _) -> if Set.mem live dest then Some instr else None))
+        block |>Block.to_list
+        |> List.filter_map
+             ~f:(fun ({ instr; before = live; _ } : Block.instr_with_lattice) ->
+               eprint_s [%message (instr : Bril.Instr.t) (live : Live_vars.t)];
+               if Transfer.is_root instr
+               then Some instr
+               else (
+                 match Bril.Instr.dest instr with
+                 | None -> None
+                 | Some (dest, _) -> if Set.mem live dest then Some instr else None))
       in
       instrs)
   in

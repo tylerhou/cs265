@@ -1,0 +1,10 @@
+@main {
+.__b0:
+  x: int = const 4;
+  jmp .label;
+.label:
+  copy1: int = const 4;
+  copy2: int = const 4;
+  copy3: int = const 4;
+  print copy3;
+}

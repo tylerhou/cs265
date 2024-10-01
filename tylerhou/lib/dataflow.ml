@@ -12,15 +12,34 @@ module Make (Transfer : Transfer) = struct
       (* The state after (before) the last (first) instruction in a forward (backward) analysis *)
       }
     [@@deriving compare, equal, sexp_of]
+
+    type instr_with_lattice =
+      { before : Transfer.Lattice.t
+      ; instr : Bril.Instr.t
+      ; after : Transfer.Lattice.t
+      }
+
+    let to_list (t : t) : instr_with_lattice list =
+      let output, _ =
+        List.fold
+          (List.rev t.instructions)
+          ~init:([], t.block_end)
+          ~f:(fun (output, after) (instr, before) ->
+            { before; instr; after } :: output, before)
+      in
+      output
+    ;;
   end
 
-  type t =
+  type state =
     { worklist : string list
     ; blocks : Block.t String.Map.t
     ; preds : string list String.Map.t
     ; succs : string list String.Map.t
     }
   [@@deriving sexp_of]
+
+  type t = Block.t String.Map.t [@@deriving sexp_of]
 
   let of_func (func : Bril.Func.t) =
     { worklist =
@@ -53,15 +72,15 @@ module Make (Transfer : Transfer) = struct
     analysis, after instrs
   ;;
 
-  let predecessors (t : t) (label : string) = Map.find_exn t.preds label
-  let successors (t : t) (label : string) = Map.find_exn t.succs label
+  let predecessors (state : state) (label : string) = Map.find_exn state.preds label
+  let successors (state : state) (label : string) = Map.find_exn state.succs label
 
-  let update_one (t : t) : [ `Keep_going of t | `Done of Block.t String.Map.t ] =
+  let update_one (state : state) : [ `Keep_going of state | `Done of t ] =
     let run_block (label : string) (block : Block.t) : Block.t =
       let block_begin =
         let pred_analyses =
-          predecessors t label
-          |> List.map ~f:(fun pred -> (Map.find_exn t.blocks pred).block_end)
+          predecessors state label
+          |> List.map ~f:(fun pred -> (Map.find_exn state.blocks pred).block_end)
         in
         pred_analyses |> List.fold ~init:Lattice.bottom ~f:Lattice.join
       in
@@ -78,13 +97,13 @@ module Make (Transfer : Transfer) = struct
       in
       { instructions; block_end }
     in
-    match t.worklist with
-    | [] -> `Done t.blocks
+    match state.worklist with
+    | [] -> `Done state.blocks
     | label :: rest ->
       eprint_s [%message "processing" (label : string)];
-      let before = Map.find_exn t.blocks label in
+      let before = Map.find_exn state.blocks label in
       let after = run_block label before in
-      let blocks = Map.set t.blocks ~key:label ~data:after in
+      let blocks = Map.set state.blocks ~key:label ~data:after in
       let worklist =
         (* We just ran the analysis on label, remove instances of it from the
            rest of the list. Make sure to do this before we append, to avoid
@@ -97,10 +116,19 @@ module Make (Transfer : Transfer) = struct
           eprint_s [%message "reached fixpoint" (label : string)];
           without_label)
         else (
-          let adding = successors t label in
+          let adding = successors state label in
           eprint_s [%message "adding to worklist" (label : string) (adding : string list)];
           without_label @ adding)
       in
-      `Keep_going { t with worklist; blocks }
+      `Keep_going { state with worklist; blocks }
+  ;;
+
+  let run (func : Bril.Func.t) =
+    let rec loop (state : state) =
+      match update_one state with
+      | `Done state -> state
+      | `Keep_going state -> loop state
+    in
+    loop (of_func func)
   ;;
 end

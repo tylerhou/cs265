@@ -19,19 +19,23 @@ module type Intf = sig
   module type Transfer = Transfer
 
   module Make (Transfer : Transfer) : sig
-    type t
+    type t [@@deriving sexp_of]
+    type state [@@deriving sexp_of]
 
     module Block : sig
-      type t =
-        { instructions : (Bril.Instr.t * Transfer.Lattice.t) list
-            (* An instruction and the lattice before the transfer function has run. *)
-        ; block_end : Transfer.Lattice.t
-        (* The state after (before) the last (first) instruction in a forward (backward) analysis *)
+      type t [@@deriving compare, equal, sexp_of]
+
+      type instr_with_lattice =
+        { before : Transfer.Lattice.t
+        ; instr : Bril.Instr.t
+        ; after : Transfer.Lattice.t
         }
-      [@@deriving compare, equal, sexp_of]
+
+      val to_list : t -> instr_with_lattice list
     end
 
-    val of_func : Bril.Func.t -> t
-    val update_one : t -> [ `Keep_going of t | `Done of Block.t String.Map.t ]
+    val of_func : Bril.Func.t -> state
+    val update_one : state -> [ `Keep_going of state | `Done of t ]
+    val run : Bril.Func.t -> Block.t String.Map.t
   end
 end

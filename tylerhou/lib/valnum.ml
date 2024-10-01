@@ -19,23 +19,6 @@ end = struct
   let succ t = t + 1
 end
 
-(*module Lattice = struct*)
-(*  type t =*)
-(*    | Not_yet_initialized (* Bottom *)*)
-(*    | Numbered of Number.t*)
-(*    | Multiple_values (* Top *)*)
-(*  [@@deriving sexp]*)
-(**)
-(*  let join (left : t) (right : t) : t =*)
-(*    match left, right with*)
-(*    | Not_yet_initialized, right -> right*)
-(*    | left, Not_yet_initialized -> left*)
-(*    | Numbered l, Numbered r -> if Number.equal l r then left else Multiple_values*)
-(*    | Multiple_values, _ -> Multiple_values*)
-(*    | _, Multiple_values -> Multiple_values*)
-(*  ;;*)
-(*end*)
-
 module Var = struct
   module T = struct
     type t = string [@@deriving compare, sexp_of]

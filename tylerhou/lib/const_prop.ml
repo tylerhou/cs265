@@ -97,4 +97,30 @@ module Transfer = struct
     in
     after
   ;;
+
+  let direction = `Forwards
 end
+
+module Analyze_const_prop = Dataflow.Make (Transfer)
+
+let run func =
+  let blocks = Analyze_const_prop.run func in
+  let optimized_instrs =
+    List.concat_map func.order ~f:(fun label ->
+      let block = Map.find_exn blocks label in
+      let module Block = Analyze_const_prop.Block in
+      let instrs =
+        block
+        |> Block.to_list
+        |> List.map ~f:(fun ({ instr; after; _ } : Block.instr_with_lattice) ->
+          match Bril.Instr.dest instr with
+          | Some ((dest_var, _) as dest) ->
+            (match Map.find after dest_var with
+             | Some (Constant c) -> Bril.Instr.Const (dest, c)
+             | _ -> instr)
+          | None -> instr)
+      in
+      instrs)
+  in
+  Bril.Func.set_instrs func optimized_instrs
+;;

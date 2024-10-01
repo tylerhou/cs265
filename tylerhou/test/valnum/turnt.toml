@@ -8,3 +8,15 @@
 [envs.interp-ref]
     command = "bril2json < {filename} | brili -p"
     output.stdout = "-"
+
+[envs.constprop-compile]
+    command = "bril2json < {filename} | ../../_build/install/default/bin/opt constprop | bril2txt"
+    output.constprop-out = "-"
+
+[envs.constprop-interp]
+    command = "bril2json < {filename} | ../../_build/install/default/bin/opt constprop | brili -p"
+    output.stdout = "-"
+
+[envs.constprop-interp-ref]
+    command = "bril2json < {filename} | brili -p"
+    output.stdout = "-"

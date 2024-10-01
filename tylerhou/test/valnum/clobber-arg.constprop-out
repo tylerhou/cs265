@@ -1,0 +1,7 @@
+@main {
+.__b0:
+  a: int = const 1;
+  b: int = const 2;
+.lbl:
+  b: int = const 3;
+}

@@ -24,3 +24,10 @@ pipeline = [
     "_build/install/default/bin/opt valnum dce",
     "brili -p {args}",
 ]
+
+[runs.valnum-constprop-dce]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt valnum constprop dce",
+    "brili -p {args}",
+]

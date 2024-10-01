@@ -13,6 +13,7 @@ let command =
            match opt with
            | "valnum" -> Valnum.run
            | "dce" -> Dce.run
+           | "constprop" -> Const_prop.run
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")
