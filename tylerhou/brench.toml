@@ -4,24 +4,17 @@ extract = 'total_dyn_inst: (\d+)'
 [runs.baseline]
 pipeline = ["bril2json", "brili -p {args}"]
 
-[runs.dce]
-pipeline = [
-    "bril2json",
-    "_build/install/default/bin/opt dce",
-    "brili -p {args}",
-]
-
-[runs.valnum]
-pipeline = [
-    "bril2json",
-    "_build/install/default/bin/opt valnum",
-    "brili -p {args}",
-]
-
 [runs.valnum-dce]
 pipeline = [
     "bril2json",
     "_build/install/default/bin/opt valnum dce",
+    "brili -p {args}",
+]
+
+[runs.constprop-dce]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt constprop dce",
     "brili -p {args}",
 ]
 

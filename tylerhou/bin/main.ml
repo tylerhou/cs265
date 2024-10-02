@@ -18,11 +18,14 @@ let command =
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")
        in
+       let rec fixpoint_opt before =
+         let after = List.fold optimizations ~init:before ~f:(fun bril opt -> opt bril) in
+         if Bril.Func.equal before after then after else fixpoint_opt after
+       in
        In_channel.input_all In_channel.stdin
        |> Yojson.Basic.from_string
        |> Bril.from_json
-       |> List.map ~f:(fun input ->
-         List.fold optimizations ~init:input ~f:(fun bril opt -> opt bril))
+       |> List.map ~f:fixpoint_opt
        |> Bril.to_json
        |> Yojson.Basic.to_string
        |> Out_channel.output_string Out_channel.stdout)
