@@ -14,6 +14,7 @@ let command =
            | "valnum" -> Valnum.run
            | "dce" -> Dce.run
            | "constprop" -> Const_prop.run
+           | "ssa" -> Ssa.run
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")

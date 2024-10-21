@@ -29,12 +29,13 @@ module Lattice = struct
   ;;
 
   let bottom = Var.Map.empty
+  let init = Var.Map.empty
 end
 
 module Transfer = struct
   module Lattice = Lattice
 
-  let transfer (before : Lattice.t) (instr : Bril.Instr.t) : Lattice.t =
+  let transfer (before : Lattice.t) ~label:_ ~(instr : Bril.Instr.t) : Lattice.t =
     let dest_val : Lattice.Value.t =
       match instr with
       | Const (_, arg) -> Constant arg
