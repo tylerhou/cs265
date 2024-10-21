@@ -19,6 +19,9 @@ module Make (Transfer : Transfer) = struct
       ; after : Transfer.Lattice.t
       }
 
+    let before (t : t) = t.instructions |> List.hd_exn |> snd
+    let after (t : t) = t.block_end
+
     let to_list (t : t) : instr_with_lattice list =
       let output, _ =
         List.fold
@@ -36,6 +39,7 @@ module Make (Transfer : Transfer) = struct
     ; blocks : Block.t String.Map.t
     ; preds : string list String.Map.t
     ; succs : string list String.Map.t
+    ; entry : string
     }
   [@@deriving sexp_of]
 
@@ -59,6 +63,7 @@ module Make (Transfer : Transfer) = struct
         (match Transfer.direction with
          | `Forwards -> func.succs
          | `Backwards -> func.preds)
+    ; entry = List.hd_exn func.order
     }
   ;;
 
@@ -82,7 +87,10 @@ module Make (Transfer : Transfer) = struct
           predecessors state label
           |> List.map ~f:(fun pred -> (Map.find_exn state.blocks pred).block_end)
         in
-        pred_analyses |> List.fold ~init:Lattice.bottom ~f:Lattice.join
+        let init =
+          if String.equal label state.entry then Lattice.init else Lattice.bottom
+        in
+        pred_analyses |> List.fold ~init ~f:Lattice.join
       in
       let block_end, instructions =
         fold_instructions
@@ -91,7 +99,7 @@ module Make (Transfer : Transfer) = struct
           ~f:(fun (before, instrs) (instr, _) ->
             (* eprint_s [%message "before transfer" (before : Lattice.t)]; *)
             (* eprint_s [%message "    " (instr : Bril.Instr.t)]; *)
-            let after = Transfer.transfer before instr in
+            let after = Transfer.transfer before ~label ~instr in
             (* eprint_s [%message "after transfer" (after : Lattice.t)]; *)
             after, (instr, before) :: instrs)
       in

@@ -3,8 +3,9 @@ open! Core
 module Live_vars = struct
   type t = Var.Set.t [@@deriving compare, equal, sexp_of]
 
-  let join (t1 : t) (t2 : t) : t = Set.union t1 t2
   let bottom : t = Var.Set.empty
+  let init : t = Var.Set.empty
+  let join (t1 : t) (t2 : t) : t = Set.union t1 t2
 end
 
 module Transfer = struct
@@ -33,7 +34,9 @@ module Transfer = struct
     | PtrAdd _ -> false
   ;;
 
-  let transfer (live : Live_vars.t) (instr : Bril.Instr.t) : Live_vars.t =
+  let transfer (live : Live_vars.t) ~label:_ ~(instr : Bril.Instr.t)
+    : Live_vars.t
+    =
     let dest = Bril.Instr.dest instr in
     let will_args_be_used =
       let will_dest_be_used =
@@ -72,7 +75,8 @@ let run func =
       let block = Map.find_exn blocks label in
       let module Block = Analyze_live_vars.Block in
       let instrs =
-        block |>Block.to_list
+        block
+        |> Block.to_list
         |> List.filter_map
              ~f:(fun ({ instr; before = live; _ } : Block.instr_with_lattice) ->
                eprint_s [%message (instr : Bril.Instr.t) (live : Live_vars.t)];

@@ -1,0 +1,16 @@
+@main {
+.__b0:
+  cond: bool = const true;
+.entry:
+  a.1: int = const 47;
+  br cond .left .right;
+.left:
+  a.2: int = add a.1 a.1;
+  jmp .zexit;
+.right:
+  a.3: int = mul a.1 a.1;
+  jmp .zexit;
+.zexit:
+  a.4: int = phi a.2 a.3 .left .right;
+  print a.4;
+}

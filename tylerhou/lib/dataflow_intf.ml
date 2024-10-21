@@ -4,13 +4,14 @@ module type Lattice = sig
   type t [@@deriving compare, equal, sexp_of]
 
   val bottom : t
+  val init : t
   val join : t -> t -> t
 end
 
 module type Transfer = sig
   module Lattice : Lattice
 
-  val transfer : Lattice.t -> Bril.Instr.t -> Lattice.t
+  val transfer : Lattice.t -> label:string -> instr:Bril.Instr.t -> Lattice.t
   val direction : [ `Forwards | `Backwards ]
 end
 
@@ -24,6 +25,9 @@ module type Intf = sig
 
     module Block : sig
       type t [@@deriving compare, equal, sexp_of]
+
+      val before : t -> Transfer.Lattice.t
+      val after : t -> Transfer.Lattice.t
 
       type instr_with_lattice =
         { before : Transfer.Lattice.t

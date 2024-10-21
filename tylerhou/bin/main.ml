@@ -8,23 +8,29 @@ let command =
        anon (non_empty_sequence_as_list ("pass" %: string))
      in
      fun () ->
-       let optimizations =
-         List.map optimizations ~f:(fun opt ->
+       let optimization_fns =
+         List.filter_map optimizations ~f:(fun opt ->
            match opt with
-           | "valnum" -> Valnum.run
-           | "dce" -> Dce.run
-           | "constprop" -> Const_prop.run
+           | "valnum" -> Some Valnum.run
+           | "dce" -> Some Dce.run
+           | "constprop" -> Some Const_prop.run
+           | "ssa" -> None
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")
        in
        let rec fixpoint_opt before =
-         let after = List.fold optimizations ~init:before ~f:(fun bril opt -> opt bril) in
+         let after =
+           List.fold optimization_fns ~init:before ~f:(fun bril opt -> opt bril)
+         in
          if Bril.Func.equal before after then after else fixpoint_opt after
        in
        In_channel.input_all In_channel.stdin
        |> Yojson.Basic.from_string
        |> Bril.from_json
+       |> (if List.mem optimizations "ssa" ~equal:String.equal
+           then List.map ~f:Ssa.run
+           else Fn.id)
        |> List.map ~f:fixpoint_opt
        |> Bril.to_json
        |> Yojson.Basic.to_string

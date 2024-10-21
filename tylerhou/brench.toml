@@ -4,6 +4,13 @@ extract = 'total_dyn_inst: (\d+)'
 [runs.baseline]
 pipeline = ["bril2json", "brili -p {args}"]
 
+[runs.ssa]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt ssa",
+    "brili -p {args}",
+]
+
 [runs.valnum-dce]
 pipeline = [
     "bril2json",
