@@ -2,9 +2,6 @@ benchmarks = '../benchmarks/core/*.bril'
 extract = 'total_dyn_inst: (\d+)'
 
 [runs.baseline]
-pipeline = ["bril2json", "brili -p {args}"]
-
-[runs.ssa]
 pipeline = [
     "bril2json",
     "_build/install/default/bin/opt ssa",
@@ -14,20 +11,20 @@ pipeline = [
 [runs.valnum-dce]
 pipeline = [
     "bril2json",
-    "_build/install/default/bin/opt valnum dce",
+    "_build/install/default/bin/opt ssa valnum dce",
     "brili -p {args}",
 ]
 
 [runs.constprop-dce]
 pipeline = [
     "bril2json",
-    "_build/install/default/bin/opt constprop dce",
+    "_build/install/default/bin/opt ssa constprop dce",
     "brili -p {args}",
 ]
 
 [runs.valnum-constprop-dce]
 pipeline = [
     "bril2json",
-    "_build/install/default/bin/opt valnum constprop dce",
+    "_build/install/default/bin/opt ssa valnum constprop dce",
     "brili -p {args}",
 ]
