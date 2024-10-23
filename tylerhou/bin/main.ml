@@ -8,12 +8,15 @@ let command =
        anon (non_empty_sequence_as_list ("pass" %: string))
      in
      fun () ->
+       Random.self_init ();
        let optimization_fns =
+         let vbe_prefix = Int32.to_string (Random.int32 Int32.max_value) in
          List.filter_map optimizations ~f:(fun opt ->
            match opt with
            | "valnum" -> Some Valnum.run
            | "dce" -> Some Dce.run
            | "constprop" -> Some Const_prop.run
+           | "vbe" -> Some (Very_busy_exprs.run ~fresh_instr_prefix:vbe_prefix)
            | "ssa" -> None
            | other ->
              eprint_s [%message "no such optimization" (other : string)];

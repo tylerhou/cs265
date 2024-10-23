@@ -28,6 +28,7 @@ module type Intf = sig
 
       val before : t -> Transfer.Lattice.t
       val after : t -> Transfer.Lattice.t
+      val instrs : t -> Bril.Instr.t list
 
       type instr_with_lattice =
         { before : Transfer.Lattice.t

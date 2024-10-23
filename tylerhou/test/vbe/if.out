@@ -1,0 +1,21 @@
+@main {
+._special_entry_for_ssa:
+  376807418.0: int = const 1;
+  376807418.0: int = const 2;
+  376807418.0: bool = const true;
+.__b0:
+  cond.0: bool = const true;
+  a.0: int = const 1;
+  b.0: int = const 2;
+  376807418.1: int = add a.0 b.0;
+  br cond.0 .left .right;
+.left:
+  c.0: int = add a.0 b.0;
+  jmp .end;
+.right:
+  c.1: int = add a.0 b.0;
+  jmp .end;
+.end:
+  c.2: int = phi c.0 c.1 .left .right;
+  print c.2;
+}

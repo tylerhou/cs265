@@ -28,3 +28,10 @@ pipeline = [
     "_build/install/default/bin/opt ssa valnum constprop dce",
     "brili -p {args}",
 ]
+
+[runs.vbe]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt ssa vbe",
+    "brili -p {args}",
+]

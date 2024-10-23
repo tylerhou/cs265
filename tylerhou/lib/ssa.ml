@@ -87,6 +87,9 @@ let run func =
        | _ -> false)
   then func
   else (
+    (* Add an entry block for function arguments. This is so that phi
+       instructions for arguments are properly placed when arguments are
+       mutated and the entry basic block has incoming control flow. *)
     let instrs = Bril.Instr.Label "_special_entry_for_ssa" :: Bril.Func.instrs func in
     let func = Bril.Func.set_instrs func instrs in
     let blocks = Analyze_dominance.run func in
