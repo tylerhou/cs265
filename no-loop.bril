@@ -1,0 +1,65 @@
+@main(input: int) {
+._special_entry_for_ssa:
+.__b0:
+  zero.0: int = const 0;
+  ten.0: int = const 10;
+  sum.0: int = const 0;
+  digits.0: int = call @getDigits input;
+  tmp.0: int = id input;
+.loop:
+  tmp.1: int = phi tmp.0 tmp.2 .__b0 .body;
+  sum.1: int = phi sum.0 sum.2 .__b0 .body;
+  b.1: bool = gt tmp.1 zero.0;
+  br b.1 .body .done;
+.body:
+  digit.1: int = call @mod tmp.1 ten.0;
+  pow.1: int = call @power digit.1 digits.0;
+  sum.2: int = add sum.1 pow.1;
+  tmp.2: int = div tmp.1 ten.0;
+  jmp .loop;
+.done:
+  res.0: bool = eq input sum.1;
+  print res.0;
+}
+@getDigits(n: int): int {
+._special_entry_for_ssa:
+.__b0:
+  ten.0: int = const 10;
+  zero.0: int = const 0;
+  one.0: int = const 1;
+  div.0: int = div n ten.0;
+  cond.0: bool = eq div.0 zero.0;
+  br cond.0 .then .else;
+.then:
+  ret one.0;
+.else:
+  rec.0: int = call @getDigits div.0;
+  res.0: int = add rec.0 one.0;
+  ret res.0;
+}
+@mod(a: int, b: int): int {
+._special_entry_for_ssa:
+.__b0:
+  q.0: int = div a b;
+  aq.0: int = mul b q.0;
+  mod.0: int = sub a aq.0;
+  ret mod.0;
+}
+@power(base: int, exp: int): int {
+._special_entry_for_ssa:
+.__b0:
+  zero.0: int = const 0;
+  one.0: int = const 1;
+  res.0: int = const 1;
+.loop:
+  res.1: int = phi res.0 res.2 .__b0 .body;
+  exp.0: int = phi exp exp.1 .__b0 .body;
+  b.1: bool = eq exp.0 zero.0;
+  br b.1 .done .body;
+.body:
+  res.2: int = mul res.1 base;
+  exp.1: int = sub exp.0 one.0;
+  jmp .loop;
+.done:
+  ret res.1;
+}

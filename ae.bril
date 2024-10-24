@@ -1,0 +1,48 @@
+@main {
+._special_entry_for_ssa:
+  v0.0: int = const 5;
+  x.0: int = id v0.0;
+  v1.0: int = id x.0;
+  call @generateNthRow v1.0;
+}
+@generateNthRow(x: int) {
+._special_entry_for_ssa:
+.__b0:
+  v0.0: int = const 1;
+  prev.0: int = id v0.0;
+  v1.0: int = id prev.0;
+  print v1.0;
+  v2.0: int = const 0;
+  v4.0: int = id v2.0;
+  i.0: int = id v4.0;
+.for.cond.3:
+  i.1: int = phi i.0 i.2 .__b0 .for.body.3;
+  prev.1: int = phi prev.0 prev.2 .__b0 .for.body.3;
+  v5.1: int = id i.1;
+  v6.1: int = id x;
+  v7.1: bool = lt v5.1 v6.1;
+  br v7.1 .for.body.3 .for.end.3;
+.for.body.3:
+  v8.1: int = id v6.1;
+  v9.1: int = id v5.1;
+  v10.1: int = sub v8.1 v9.1;
+  temp.1: int = id v10.1;
+  v11.1: int = id temp.1;
+  v12.1: int = id v1.0;
+  v13.1: int = add v11.1 v12.1;
+  temp.2: int = id v13.1;
+  v14.1: int = id prev.1;
+  v15.1: int = id temp.2;
+  v16.1: int = mul v14.1 v15.1;
+  curr.1: int = id v16.1;
+  v17.1: int = id curr.1;
+  print v17.1;
+  v19.1: int = id v17.1;
+  prev.2: int = id v19.1;
+  v20.1: int = id v9.1;
+  v21.1: int = id v12.1;
+  v22.1: int = add v20.1 v21.1;
+  i.2: int = id v22.1;
+  jmp .for.cond.3;
+.for.end.3:
+}

@@ -8,5 +8,5 @@ type t =
 
 include Comparable.S_plain with type t := t
 
-val of_instr : Bril.Instr.t -> t option
+val of_instr : Bril.Instr.t -> (Var.t * Bril.Bril_type.t * t) option
 val to_instr : Var.t -> t -> Bril.Instr.t

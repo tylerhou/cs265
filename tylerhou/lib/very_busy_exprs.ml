@@ -37,7 +37,7 @@ module Transfer = struct
       in
       let gen =
         match Pure_expr.of_instr instr with
-        | Some expr -> Set.add killed expr
+        | Some (_, _, expr) -> Set.add killed expr
         | None -> killed
       in
       Some gen
@@ -49,7 +49,8 @@ end
 
 module Analyze = Dataflow.Make (Transfer)
 
-let run ~(fresh_instr_prefix : string) (func : Bril.Func.t) =
+let run (func : Bril.Func.t) =
+  let fresh_instr_prefix = Int32.to_string (Random.int32 Int32.max_value) in
   let blocks = Analyze.run func in
   eprint_s [%message "very busy expressions" (blocks : Analyze.Block.t String.Map.t)];
   let with_early_busy_instrs =
@@ -71,7 +72,12 @@ let run ~(fresh_instr_prefix : string) (func : Bril.Func.t) =
         match before with
         | Bottom -> Error.raise_s [%message "block is still bottom" (block : Block.t)]
         | Some before ->
-          before |> Set.to_list |> List.map ~f:(Pure_expr.to_instr (fresh ()))
+          before
+          |> Set.to_list
+          |> List.filter ~f:(function
+            | Unary (_, Id, _) -> false (* Copy propagate *)
+            | _ -> true)
+          |> List.map ~f:(fun expr -> Pure_expr.to_instr (fresh ()) expr)
       in
       let very_busy_instrs =
         List.filter very_busy_instrs ~f:(fun instr ->

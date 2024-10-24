@@ -10,23 +10,24 @@ let command =
      fun () ->
        Random.self_init ();
        let optimization_fns =
-         let vbe_prefix = Int32.to_string (Random.int32 Int32.max_value) in
          List.filter_map optimizations ~f:(fun opt ->
            match opt with
-           | "valnum" -> Some Valnum.run
-           | "dce" -> Some Dce.run
-           | "constprop" -> Some Const_prop.run
-           | "vbe" -> Some (Very_busy_exprs.run ~fresh_instr_prefix:vbe_prefix)
            | "ssa" -> None
+           | "ae" -> Some Available_exprs.run
+           | "constprop" -> Some Const_prop.run
+           | "cp" -> Some Copy_prop.run
+           | "dce" -> Some Dce.run
+           | "valnum" -> Some Valnum.run
+           | "vbe" -> Some Very_busy_exprs.run
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")
        in
-       let rec fixpoint_opt before =
+       let rec fixpoint_opt limit before =
          let after =
            List.fold optimization_fns ~init:before ~f:(fun bril opt -> opt bril)
          in
-         if Bril.Func.equal before after then after else fixpoint_opt after
+         if Bril.Func.equal before after || limit = 0 then after else fixpoint_opt (limit - 1) after
        in
        In_channel.input_all In_channel.stdin
        |> Yojson.Basic.from_string
@@ -34,7 +35,7 @@ let command =
        |> (if List.mem optimizations "ssa" ~equal:String.equal
            then List.map ~f:Ssa.run
            else Fn.id)
-       |> List.map ~f:fixpoint_opt
+       |> List.map ~f:(fixpoint_opt 10)
        |> Bril.to_json
        |> Yojson.Basic.to_string
        |> Out_channel.output_string Out_channel.stdout)

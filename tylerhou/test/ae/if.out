@@ -1,0 +1,20 @@
+@main {
+._special_entry_for_ssa:
+.__b0:
+  cond.0: bool = const true;
+  a.0: int = const 1;
+  b.0: int = const 2;
+  c.0: int = add a.0 b.0;
+  br cond.0 .left .right;
+.left:
+  d.0: int = id c.0;
+  print d.0;
+  jmp .end;
+.right:
+  e.0: int = id c.0;
+  print e.0;
+  jmp .end;
+.end:
+  e.1: int = phi __undefined e.0 .left .right;
+  d.1: int = phi d.0 __undefined .left .right;
+}

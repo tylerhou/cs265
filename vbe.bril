@@ -1,0 +1,33 @@
+@main(input: int) {
+._special_entry_for_ssa:
+.__b0:
+  n.0: int = id input;
+  v0.0: int = const 0;
+  v1.0: int = const 10;
+  result.0: int = id v0.0;
+  v2.0: bool = const true;
+  notdone.0: bool = id v2.0;
+.for.cond.3:
+  result.1: int = phi result.0 result.3 result.3 .__b0 .if.body .for.incre;
+  notdone.1: bool = phi notdone.0 notdone.2 notdone.1 .__b0 .if.body .for.incre;
+  n.1: int = phi n.0 n.2 n.2 .__b0 .if.body .for.incre;
+  v4.1: bool = id notdone.1;
+  br v4.1 .for.body.3 .for.end.3;
+.for.body.3:
+  v5.1: int = id n.1;
+  a.1: int = div v5.1 v1.0;
+  floor.1: int = mul a.1 v1.0;
+  remainder.1: int = sub v5.1 floor.1;
+  result.2: int = mul result.1 v1.0;
+  result.3: int = add result.2 remainder.1;
+  n.2: int = id a.1;
+  comp1.1: bool = eq n.2 v0.0;
+  br comp1.1 .if.body .for.incre;
+.if.body:
+  notdone.2: bool = const false;
+  jmp .for.cond.3;
+.for.incre:
+  jmp .for.cond.3;
+.for.end.3:
+  print result.1;
+}

@@ -1,0 +1,33 @@
+@main {
+._special_entry_for_ssa:
+  v1.0: int = const 5;
+  call @generateNthRow v1.0;
+}
+@generateNthRow(x: int) {
+._special_entry_for_ssa:
+.__b0:
+  prev.0: int = const 1;
+  v1.0: int = const 1;
+  print v1.0;
+  i.0: int = const 0;
+.for.cond.3:
+  i.1: int = phi i.0 i.2 .__b0 .for.body.3;
+  prev.1: int = phi prev.0 prev.2 .__b0 .for.body.3;
+  v5.1: int = id i.1;
+  v6.1: int = id x;
+  v7.1: bool = lt v5.1 v6.1;
+  br v7.1 .for.body.3 .for.end.3;
+.for.body.3:
+  v8.1: int = id x;
+  v9.1: int = id i.1;
+  v11.1: int = sub v8.1 v9.1;
+  v12.1: int = const 1;
+  v14.1: int = id prev.1;
+  v15.1: int = add v11.1 v12.1;
+  v17.1: int = mul v14.1 v15.1;
+  print v17.1;
+  prev.2: int = mul v14.1 v15.1;
+  i.2: int = add v9.1 v12.1;
+  jmp .for.cond.3;
+.for.end.3:
+}

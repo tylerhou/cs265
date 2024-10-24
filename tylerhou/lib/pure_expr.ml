@@ -11,11 +11,11 @@ end
 include T
 include Comparable.Make_plain (T)
 
-let of_instr (instr : Bril.Instr.t) : t option =
+let of_instr (instr : Bril.Instr.t) : (Var.t * Bril.Bril_type.t * t) option =
   match instr with
-  | Const ((_, t), c) -> Some (Const (t, c))
-  | Unary ((_, t), op, arg) -> Some (Unary (t, op, arg))
-  | Binary ((_, t), op, l, r) -> Some (Binary (t, l, op, r))
+  | Const ((dest, t), c) -> Some (dest, t, Const (t, c))
+  | Unary ((dest, t), op, arg) -> Some (dest, t, Unary (t, op, arg))
+  | Binary ((dest, t), op, l, r) -> Some (dest, t, Binary (t, l, op, r))
   | _ -> None
 ;;
 

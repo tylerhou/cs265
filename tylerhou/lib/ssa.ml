@@ -78,7 +78,7 @@ end
 
 let run func =
   (* Our reaching definition calculation is a bit buggy for programs already in
-     SSA form since we treat phis as an actual function; subsequent phis might
+     SSA form since we treat phis as an actual instruction; subsequent phis might
      see reaching definitions from a previous phi in the block rather than
      previous blocks. So assume any function with a Phi node is already in SSA. *)
   if List.exists (Bril.Func.instrs func) ~f:(fun instr ->
