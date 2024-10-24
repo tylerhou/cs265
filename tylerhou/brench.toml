@@ -18,6 +18,6 @@ pipeline = [
 [runs.vbe-ae-cp-dce]
 pipeline = [
     "bril2json",
-    "_build/install/default/bin/opt ssa vbe ae cp dce",
+    "_build/install/default/bin/opt ssa vbe ae cp constprop dce",
     "brili -p {args}",
 ]
