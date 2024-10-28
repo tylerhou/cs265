@@ -19,6 +19,7 @@ let command =
            | "dce" -> Some Dce.run
            | "valnum" -> Some Valnum.run
            | "vbe" -> Some Very_busy_exprs.run
+           | "alias" -> Some Alias.run
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")
