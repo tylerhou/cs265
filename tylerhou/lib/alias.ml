@@ -18,6 +18,12 @@ module Points_to = struct
       | `Both (l, r) ->
         if not (equal_target l r) then failwith "program not in ssa form" else Some l)
   ;;
+
+  let union (tgt1 : target) (tgt2 : target) : target =
+    match tgt1, tgt2 with
+    | All_memory_locations, _ | _, All_memory_locations -> All_memory_locations
+    | Exactly s1, Exactly s2 -> Exactly (Set.union s1 s2)
+  ;;
 end
 
 module Transfer = struct
@@ -36,6 +42,16 @@ module Transfer = struct
     | Alloc ((dest, _), _) ->
       Map.set points_to ~key:dest ~data:(Exactly (Var.Set.singleton dest))
     | Load ((dest, _), _) -> Map.set points_to ~key:dest ~data:All_memory_locations
+    | Phi ((dest, _), args) ->
+      let targets =
+        args
+        |> List.map ~f:(fun (_, arg) ->
+          match Map.find points_to arg with
+          | Some s -> s
+          | None -> Exactly Var.Set.empty)
+        |> List.fold ~init:(Lattice.Exactly Var.Set.empty) ~f:Points_to.union
+      in
+      Map.set points_to ~key:dest ~data:targets
     | _ -> points_to
   ;;
 
@@ -48,3 +64,4 @@ let run func =
   let blocks = Analysis.run func in
   eprint_s [%message "points_to" (blocks : Analysis.Block.t String.Map.t)];
   func
+;;

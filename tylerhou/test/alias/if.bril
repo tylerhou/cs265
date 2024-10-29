@@ -1,0 +1,21 @@
+@main {
+    zero: int = const 0;
+    four: int = const 4;
+    a: ptr<int> = alloc four;
+    b: ptr<int> = alloc four;
+    c: ptr<int> = ptradd a zero;
+
+    d: ptr<ptr<int>> = alloc four;
+    e: ptr<int> = load d;
+
+    cond: bool = const true;
+    br cond .t .f;
+.t:
+    p: ptr<int> = id a;
+    jmp .end;
+.f:
+    p: ptr<int> = id b;
+    jmp .end;
+.end:
+    i: int = load p;
+}

@@ -117,7 +117,7 @@ module Make (Transfer : Transfer) = struct
     match state.worklist with
     | [] -> `Done state.blocks
     | label :: rest ->
-      eprint_s [%message "processing" (label : string)];
+      (* eprint_s [%message "processing" (label : string)]; *)
       let before = Map.find_exn state.blocks label in
       let after = run_block label before in
       let blocks = Map.set state.blocks ~key:label ~data:after in
@@ -130,11 +130,11 @@ module Make (Transfer : Transfer) = struct
         in
         if Block.equal before after
         then (
-          eprint_s [%message "reached fixpoint" (label : string)];
+          (* eprint_s [%message "reached fixpoint" (label : string)]; *)
           without_label)
         else (
           let adding = successors state label in
-          eprint_s [%message "adding to worklist" (label : string) (adding : string list)];
+          (* eprint_s [%message "adding to worklist" (label : string) (adding : string list)]; *)
           without_label @ adding)
       in
       `Keep_going { state with worklist; blocks }
