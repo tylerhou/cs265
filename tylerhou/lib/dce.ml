@@ -34,7 +34,7 @@ module Transfer = struct
     | PtrAdd _ -> false
   ;;
 
-  let transfer (live : Live_vars.t) ~label:_ ~(instr : Bril.Instr.t)
+  let transfer (live : Live_vars.t) ~point:_ ~(instr : Bril.Instr.t)
     : Live_vars.t
     =
     let dest = Bril.Instr.dest instr in

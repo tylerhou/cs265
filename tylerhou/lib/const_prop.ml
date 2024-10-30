@@ -3,15 +3,15 @@ open! Core
 module Lattice = struct
   module Value = struct
     type t =
-      | Not_yet_initialized (* Bottom *)
+      | Uninitialized (* Bottom *)
       | Constant of Bril.Const.t
       | Multiple_values (* Top *)
     [@@deriving compare, equal, sexp_of]
 
     let join (left : t) (right : t) : t =
       match left, right with
-      | Not_yet_initialized, right -> right
-      | left, Not_yet_initialized -> left
+      | Uninitialized, right -> right
+      | left, Uninitialized -> left
       | Constant l, Constant r -> if Bril.Const.equal l r then left else Multiple_values
       | Multiple_values, _ -> Multiple_values
       | _, Multiple_values -> Multiple_values
@@ -35,29 +35,29 @@ end
 module Transfer = struct
   module Lattice = Lattice
 
-  let transfer (before : Lattice.t) ~label:_ ~(instr : Bril.Instr.t) : Lattice.t =
+  let transfer (before : Lattice.t) ~point:_ ~(instr : Bril.Instr.t) : Lattice.t =
     let dest_val : Lattice.Value.t =
       match instr with
       | Const (_, arg) -> Constant arg
       | Unary (_, Id, arg) ->
-        Map.find before arg |> Option.value ~default:Not_yet_initialized
+        Map.find before arg |> Option.value ~default:Uninitialized
       | Unary (_, Not, arg) ->
         (match Map.find before arg with
          | Some (Constant (Bool b)) -> Constant (Bool (not b))
          | Some (Constant (Int _)) ->
            Multiple_values (* undefined behavior, be conservative *)
          | Some other -> other
-         | None -> Not_yet_initialized)
+         | None -> Uninitialized)
       | Binary (_, op, left, right) ->
         (match op with
          | Add | Mul | Sub | Div | Eq | Lt | Gt | Le | Ge ->
            (match
-              ( Option.value (Map.find before left) ~default:Not_yet_initialized
-              , Option.value (Map.find before right) ~default:Not_yet_initialized )
+              ( Option.value (Map.find before left) ~default:Uninitialized
+              , Option.value (Map.find before right) ~default:Uninitialized )
             with
-            | Not_yet_initialized, Not_yet_initialized -> Not_yet_initialized
+            | Uninitialized, Uninitialized -> Uninitialized
             | Multiple_values, _ | _, Multiple_values -> Multiple_values
-            | Not_yet_initialized, Constant _ | Constant _, Not_yet_initialized ->
+            | Uninitialized, Constant _ | Constant _, Uninitialized ->
               Multiple_values (* Be conservative *)
             | Constant (Int left), Constant (Int right) ->
               Constant
@@ -75,12 +75,12 @@ module Transfer = struct
             | _ -> Multiple_values (* Be conservative *))
          | And | Or ->
            (match
-              ( Option.value (Map.find before left) ~default:Not_yet_initialized
-              , Option.value (Map.find before right) ~default:Not_yet_initialized )
+              ( Option.value (Map.find before left) ~default:Uninitialized
+              , Option.value (Map.find before right) ~default:Uninitialized )
             with
-            | Not_yet_initialized, Not_yet_initialized -> Not_yet_initialized
+            | Uninitialized, Uninitialized -> Uninitialized
             | Multiple_values, _ | _, Multiple_values -> Multiple_values
-            | Not_yet_initialized, Constant _ | Constant _, Not_yet_initialized ->
+            | Uninitialized, Constant _ | Constant _, Uninitialized ->
               Multiple_values (* Be conservative *)
             | Constant (Bool left), Constant (Bool right) ->
               Constant

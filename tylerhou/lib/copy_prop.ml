@@ -29,7 +29,7 @@ end
 module Transfer = struct
   module Lattice = Copies
 
-  let transfer (copies : Copies.t) ~label:_ ~(instr : Bril.Instr.t) : Copies.t =
+  let transfer (copies : Copies.t) ~point:_ ~(instr : Bril.Instr.t) : Copies.t =
     match instr, copies with
     | Unary ((dest, _), Id, arg), Vars copies -> Vars (Map.set copies ~key:dest ~data:arg)
     | _ -> copies

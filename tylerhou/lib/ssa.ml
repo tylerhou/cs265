@@ -20,10 +20,10 @@ end
 module Dominance_transfer = struct
   module Lattice = Dominance_lattice
 
-  let transfer (lat : Lattice.t) ~label ~instr:_ : Lattice.t =
+  let transfer (lat : Lattice.t) ~point:Program_point.{ block; _ } ~instr:_ : Lattice.t =
     match lat with
     | Bottom -> Bottom
-    | Some set -> Some (Set.add set label)
+    | Some set -> Some (Set.add set block)
   ;;
 
   let direction = `Forwards
@@ -65,7 +65,7 @@ module Reaching_defn_transfer (Data : sig
 struct
   module Lattice = Renamed_by_original (Data)
 
-  let transfer (renamed_by_original : Lattice.t) ~label:_ ~instr : Lattice.t =
+  let transfer (renamed_by_original : Lattice.t) ~point:_ ~instr : Lattice.t =
     match Bril.Instr.dest instr with
     | Some (renamed, _) ->
       let original, defining_block = Map.find_exn Data.original_by_renamed renamed in

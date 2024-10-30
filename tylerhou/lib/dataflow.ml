@@ -18,6 +18,7 @@ module Make (Transfer : Transfer) = struct
       ; instr : Bril.Instr.t
       ; after : Transfer.Lattice.t
       }
+    [@@deriving compare, equal, sexp_of]
 
     let before (t : t) =
       t.instructions
@@ -30,8 +31,7 @@ module Make (Transfer : Transfer) = struct
     let after (t : t) = t.block_end
     let instrs (t : t) = List.map t.instructions ~f:fst
 
-    (* TODO: Rename to "instrs_with_lattice" *)
-    let to_list (t : t) : instr_with_lattice list =
+    let instrs_with_lattice (t : t) : instr_with_lattice list =
       let output, _ =
         List.fold
           (List.rev t.instructions)
@@ -41,6 +41,9 @@ module Make (Transfer : Transfer) = struct
       in
       output
     ;;
+
+    (* TODO: Rename to "instrs_with_lattice" *)
+    let to_list (t : t) : instr_with_lattice list = instrs_with_lattice t
   end
 
   type state =
@@ -75,11 +78,13 @@ module Make (Transfer : Transfer) = struct
   ;;
 
   let fold_instructions instrs ~init ~f =
+    let instrs = List.mapi instrs ~f:(fun i x -> i, x) in
     let before, after =
       match Transfer.direction with
       | `Forwards -> Fn.id, List.rev
       | `Backwards -> List.rev, Fn.id
     in
+    (* TODO: fold_mapi *)
     let analysis, instrs = List.fold (before instrs) ~init ~f in
     analysis, after instrs
   ;;
@@ -105,10 +110,12 @@ module Make (Transfer : Transfer) = struct
         fold_instructions
           block.instructions
           ~init:(block_begin, [])
-          ~f:(fun (before, instrs) (instr, _) ->
+          ~f:(fun (before, instrs) (i, (instr, _block_end)) ->
             (* eprint_s [%message "before transfer" (before : Lattice.t)]; *)
             (* eprint_s [%message "    " (instr : Bril.Instr.t)]; *)
-            let after = Transfer.transfer before ~label ~instr in
+            let after =
+              Transfer.transfer before ~point:{ block = label; instruction = i } ~instr
+            in
             (* eprint_s [%message "after transfer" (after : Lattice.t)]; *)
             after, (instr, before) :: instrs)
       in
@@ -129,9 +136,8 @@ module Make (Transfer : Transfer) = struct
           List.filter rest ~f:(fun other -> not (String.equal label other))
         in
         if Block.equal before after
-        then (
-          (* eprint_s [%message "reached fixpoint" (label : string)]; *)
-          without_label)
+        then (* eprint_s [%message "reached fixpoint" (label : string)]; *)
+          without_label
         else (
           let adding = successors state label in
           (* eprint_s [%message "adding to worklist" (label : string) (adding : string list)]; *)

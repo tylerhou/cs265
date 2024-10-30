@@ -19,7 +19,7 @@ end
 module Transfer = struct
   module Lattice = Very_busy_exprs
 
-  let transfer (busy : Very_busy_exprs.t) ~label:_ ~(instr : Bril.Instr.t)
+  let transfer (busy : Very_busy_exprs.t) ~point:_ ~(instr : Bril.Instr.t)
     : Very_busy_exprs.t
     =
     match busy with

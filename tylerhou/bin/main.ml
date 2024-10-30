@@ -11,6 +11,7 @@ let command =
        Random.self_init ();
        let optimization_fns =
          List.filter_map optimizations ~f:(fun opt ->
+           (* TODO: Rename these options to their module names *)
            match opt with
            | "ssa" -> None
            | "ae" -> Some Available_exprs.run
@@ -19,7 +20,7 @@ let command =
            | "dce" -> Some Dce.run
            | "valnum" -> Some Valnum.run
            | "vbe" -> Some Very_busy_exprs.run
-           | "alias" -> Some Alias.run
+           | "store_to_load" -> Some Store_to_load.run
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")

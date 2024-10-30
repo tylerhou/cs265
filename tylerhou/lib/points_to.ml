@@ -29,7 +29,7 @@ end
 module Transfer = struct
   module Lattice = Points_to
 
-  let transfer (points_to : Points_to.t) ~label:_ ~(instr : Bril.Instr.t) : Points_to.t =
+  let transfer (points_to : Points_to.t) ~point:_ ~(instr : Bril.Instr.t) : Points_to.t =
     match instr with
     | Unary ((dest, _), Id, arg) ->
       (match Map.find points_to arg with
@@ -60,8 +60,25 @@ end
 
 module Analysis = Dataflow.Make (Transfer)
 
-let run func =
+module Analysis_by_program_point = struct
+  type t = Analysis.Block.instr_with_lattice Program_point.Map.t
+  [@@deriving compare, equal, sexp_of]
+end
+
+let analyze func =
   let blocks = Analysis.run func in
-  eprint_s [%message "points_to" (blocks : Analysis.Block.t String.Map.t)];
-  func
+  (* TODO: Put this in a reusable location. Likely put the type of blocks
+     inside a Dataflow_result module. *)
+  let by_point =
+    blocks
+    |> Map.to_alist
+    |> List.concat_map ~f:(fun (block, analysis) ->
+      Analysis.Block.to_list analysis
+      |> List.mapi ~f:(fun idx v -> Program_point.{ block; instruction = idx }, v))
+    |> Program_point.Map.of_alist_exn
+  in
+  eprint_s
+    [%message
+      "points_to" (by_point : Analysis.Block.instr_with_lattice Program_point.Map.t)];
+  by_point
 ;;

@@ -24,7 +24,7 @@ end
 module Transfer = struct
   module Lattice = Available_exprs
 
-  let transfer (available : Available_exprs.t) ~label:_ ~(instr : Bril.Instr.t)
+  let transfer (available : Available_exprs.t) ~point:_ ~(instr : Bril.Instr.t)
     : Available_exprs.t
     =
     match available with
