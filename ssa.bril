@@ -1,0 +1,277 @@
+@xor(x: bool, y: bool): bool {
+._special_entry_for_ssa:
+.__b0:
+  xn.0: bool = not x;
+  yn.0: bool = not y;
+  xyn.0: bool = and x yn.0;
+  xny.0: bool = and xn.0 y;
+  res.0: bool = or xyn.0 xny.0;
+  ret res.0;
+}
+@getbit(x: int, position: int): bool {
+._special_entry_for_ssa:
+.__b0:
+  one.0: int = const 1;
+  two.0: int = const 2;
+  i.0: int = const 0;
+.loop_cond:
+  i.1: int = phi i.0 i.2 .__b0 .loop_body;
+  x.0: int = phi x x.1 .__b0 .loop_body;
+  cond.0: bool = phi __undefined cond.1 .__b0 .loop_body;
+  cond.1: bool = lt i.1 position;
+  br cond.1 .loop_body .loop_exit;
+.loop_body:
+  x.1: int = div x.0 two.0;
+  i.2: int = add i.1 one.0;
+  jmp .loop_cond;
+.loop_exit:
+  halfx.0: int = div x.0 two.0;
+  twohalfx.0: int = mul halfx.0 two.0;
+  iszero.0: bool = eq twohalfx.0 x.0;
+  res.0: bool = not iszero.0;
+  ret res.0;
+}
+@rand(state: ptr<int>) {
+._special_entry_for_ssa:
+.__b0:
+  s.0: int = load state;
+  two.0: int = const 2;
+  one.0: int = const 1;
+  head0_pos.0: int = const 11;
+  head1_pos.0: int = const 13;
+  head2_pos.0: int = const 14;
+  head3_pos.0: int = const 16;
+  head0.0: bool = call @getbit s.0 head0_pos.0;
+  head1.0: bool = call @getbit s.0 head1_pos.0;
+  head2.0: bool = call @getbit s.0 head2_pos.0;
+  head3.0: bool = call @getbit s.0 head3_pos.0;
+  fb.0: bool = call @xor head0.0 head1.0;
+  fb.1: bool = call @xor fb.0 head2.0;
+  fb.2: bool = call @xor fb.1 head3.0;
+  s.1: int = mul s.0 two.0;
+  br fb.2 .add_one .end;
+.add_one:
+  s.2: int = add s.1 one.0;
+.end:
+  s.3: int = phi s.1 s.2 .__b0 .add_one;
+  store state s.3;
+}
+@mod(x: int, m: int): int {
+._special_entry_for_ssa:
+.__b0:
+  one.0: int = const 1;
+  q.0: int = div x m;
+  multiple.0: int = mul q.0 m;
+  r.0: int = sub x multiple.0;
+  ret r.0;
+}
+@gen_uniform_csr(rows: int, cols: int, degree: int, csr_rowptr: ptr<int>, csr_colidx: ptr<int>, csr_values: ptr<int>) {
+._special_entry_for_ssa:
+.__b0:
+  one.0: int = const 1;
+  zero.0: int = const 0;
+  nnz.0: int = mul degree rows;
+  i.0: int = const 1;
+  store csr_rowptr zero.0;
+.loop_gen_rptr_cond:
+  i.1: int = phi i.0 i.2 .__b0 .loop_gen_rptr_body;
+  cond.0: bool = phi __undefined cond.1 .__b0 .loop_gen_rptr_body;
+  v.0: int = phi __undefined v.1 .__b0 .loop_gen_rptr_body;
+  p.0: ptr<int> = phi __undefined p.1 .__b0 .loop_gen_rptr_body;
+  cond.1: bool = le i.1 rows;
+  br cond.1 .loop_gen_rptr_body .loop_gen_rptr_exit;
+.loop_gen_rptr_body:
+  p.1: ptr<int> = ptradd csr_rowptr i.1;
+  v.1: int = mul degree i.1;
+  store p.1 v.1;
+  i.2: int = add i.1 one.0;
+  jmp .loop_gen_rptr_cond;
+.loop_gen_rptr_exit:
+  i.3: int = const 0;
+  colidx_incr.0: int = div cols degree;
+.loop_gen_cidx_cond:
+  i.4: int = phi i.3 i.5 .loop_gen_rptr_exit .loop_gen_cidx_body;
+  cid.0: int = phi __undefined cid.1 .loop_gen_rptr_exit .loop_gen_cidx_body;
+  cond.2: bool = phi cond.1 cond.3 .loop_gen_rptr_exit .loop_gen_cidx_body;
+  p.2: ptr<int> = phi p.0 p.3 .loop_gen_rptr_exit .loop_gen_cidx_body;
+  rid.0: int = phi __undefined rid.1 .loop_gen_rptr_exit .loop_gen_cidx_body;
+  v.2: int = phi v.0 v.4 .loop_gen_rptr_exit .loop_gen_cidx_body;
+  cond.3: bool = lt i.4 nnz.0;
+  br cond.3 .loop_gen_cidx_body .loop_gen_cidx_exit;
+.loop_gen_cidx_body:
+  rid.1: int = div i.4 degree;
+  v.3: int = mul i.4 colidx_incr.0;
+  v.4: int = add v.3 rid.1;
+  cid.1: int = call @mod v.4 cols;
+  p.3: ptr<int> = ptradd csr_colidx i.4;
+  store p.3 cid.1;
+  i.5: int = add i.4 one.0;
+  jmp .loop_gen_cidx_cond;
+.loop_gen_cidx_exit:
+  i.6: int = const 0;
+  rng.0: ptr<int> = alloc one.0;
+  seed.0: int = const 72160722;
+  store rng.0 seed.0;
+  ten.0: int = const 10;
+.loop_gen_vals_cond:
+  i.7: int = phi i.6 i.8 .loop_gen_cidx_exit .loop_gen_vals_body;
+  cond.4: bool = phi cond.3 cond.5 .loop_gen_cidx_exit .loop_gen_vals_body;
+  v.5: int = phi v.2 v.7 .loop_gen_cidx_exit .loop_gen_vals_body;
+  p.4: ptr<int> = phi p.2 p.5 .loop_gen_cidx_exit .loop_gen_vals_body;
+  cond.5: bool = lt i.7 nnz.0;
+  br cond.5 .loop_gen_vals_body .loop_gen_vals_exit;
+.loop_gen_vals_body:
+  call @rand rng.0;
+  v.6: int = load rng.0;
+  v.7: int = call @mod v.6 ten.0;
+  p.5: ptr<int> = ptradd csr_values i.7;
+  store p.5 v.7;
+  i.8: int = add i.7 one.0;
+  jmp .loop_gen_vals_cond;
+.loop_gen_vals_exit:
+  free rng.0;
+  ret;
+}
+@gen_vec(len: int, data: ptr<int>) {
+._special_entry_for_ssa:
+.__b0:
+  one.0: int = const 1;
+  i.0: int = const 0;
+  rng.0: ptr<int> = alloc one.0;
+  seed.0: int = const 85817256;
+  store rng.0 seed.0;
+  ten.0: int = const 10;
+.loop_cond:
+  i.1: int = phi i.0 i.2 .__b0 .loop_body;
+  cond.0: bool = phi __undefined cond.1 .__b0 .loop_body;
+  v.0: int = phi __undefined v.2 .__b0 .loop_body;
+  p.0: ptr<int> = phi __undefined p.1 .__b0 .loop_body;
+  cond.1: bool = lt i.1 len;
+  br cond.1 .loop_body .loop_exit;
+.loop_body:
+  call @rand rng.0;
+  v.1: int = load rng.0;
+  v.2: int = call @mod v.1 ten.0;
+  p.1: ptr<int> = ptradd data i.1;
+  store p.1 v.2;
+  i.2: int = add i.1 one.0;
+  jmp .loop_cond;
+.loop_exit:
+  free rng.0;
+  ret;
+}
+@csr_spmv(rows: int, cols: int, csr_rowptr: ptr<int>, csr_colidx: ptr<int>, csr_values: ptr<int>, vec: ptr<int>, res: ptr<int>) {
+._special_entry_for_ssa:
+.__b0:
+  one.0: int = const 1;
+  zero.0: int = const 0;
+  i.0: int = const 0;
+.loop_init_cond:
+  i.1: int = phi i.0 i.2 .__b0 .loop_init_body;
+  cond.0: bool = phi __undefined cond.1 .__b0 .loop_init_body;
+  p.0: ptr<int> = phi __undefined p.1 .__b0 .loop_init_body;
+  cond.1: bool = lt i.1 rows;
+  br cond.1 .loop_init_body .loop_init_exit;
+.loop_init_body:
+  p.1: ptr<int> = ptradd res i.1;
+  store p.1 zero.0;
+  i.2: int = add i.1 one.0;
+  jmp .loop_init_cond;
+.loop_init_exit:
+  rid.0: int = const 0;
+.loop_rows_cond:
+  cid.0: int = phi __undefined cid.1 .loop_init_exit .loop_nnzs_exit;
+  j.0: int = phi __undefined j.2 .loop_init_exit .loop_nnzs_exit;
+  end.0: int = phi __undefined end.1 .loop_init_exit .loop_nnzs_exit;
+  incr.0: int = phi __undefined incr.1 .loop_init_exit .loop_nnzs_exit;
+  cond.2: bool = phi cond.1 cond.5 .loop_init_exit .loop_nnzs_exit;
+  start.0: int = phi __undefined start.1 .loop_init_exit .loop_nnzs_exit;
+  p.2: ptr<int> = phi p.0 p.5 .loop_init_exit .loop_nnzs_exit;
+  acc.0: int = phi __undefined acc.1 .loop_init_exit .loop_nnzs_exit;
+  rid.1: int = phi rid.0 rid.2 .loop_init_exit .loop_nnzs_exit;
+  vec_val.0: int = phi __undefined vec_val.1 .loop_init_exit .loop_nnzs_exit;
+  mat_val.0: int = phi __undefined mat_val.1 .loop_init_exit .loop_nnzs_exit;
+  cond.3: bool = lt rid.1 rows;
+  br cond.3 .loop_rows_body .loop_rows_exit;
+.loop_rows_body:
+  p.3: ptr<int> = ptradd csr_rowptr rid.1;
+  start.1: int = load p.3;
+  p.4: ptr<int> = ptradd p.3 one.0;
+  end.1: int = load p.4;
+  j.1: int = add start.1 zero.0;
+.loop_nnzs_cond:
+  incr.1: int = phi incr.0 incr.2 .loop_rows_body .loop_nnzs_body;
+  cid.1: int = phi cid.0 cid.2 .loop_rows_body .loop_nnzs_body;
+  cond.4: bool = phi cond.3 cond.5 .loop_rows_body .loop_nnzs_body;
+  p.5: ptr<int> = phi p.4 p.9 .loop_rows_body .loop_nnzs_body;
+  acc.1: int = phi acc.0 acc.3 .loop_rows_body .loop_nnzs_body;
+  j.2: int = phi j.1 j.3 .loop_rows_body .loop_nnzs_body;
+  vec_val.1: int = phi vec_val.0 vec_val.2 .loop_rows_body .loop_nnzs_body;
+  mat_val.1: int = phi mat_val.0 mat_val.2 .loop_rows_body .loop_nnzs_body;
+  cond.5: bool = lt j.2 end.1;
+  br cond.5 .loop_nnzs_body .loop_nnzs_exit;
+.loop_nnzs_body:
+  p.6: ptr<int> = ptradd csr_colidx j.2;
+  cid.2: int = load p.6;
+  p.7: ptr<int> = ptradd csr_values j.2;
+  mat_val.2: int = load p.7;
+  p.8: ptr<int> = ptradd vec cid.2;
+  vec_val.2: int = load p.8;
+  p.9: ptr<int> = ptradd res rid.1;
+  acc.2: int = load p.9;
+  incr.2: int = mul mat_val.2 vec_val.2;
+  acc.3: int = add acc.2 incr.2;
+  store p.9 acc.3;
+  j.3: int = add j.2 one.0;
+  jmp .loop_nnzs_cond;
+.loop_nnzs_exit:
+  rid.2: int = add rid.1 one.0;
+  jmp .loop_rows_cond;
+.loop_rows_exit:
+  ret;
+}
+@print_arr(arr: ptr<int>, size: int) {
+._special_entry_for_ssa:
+.__b0:
+  one.0: int = const 1;
+  i.0: int = const 0;
+.loop_cond:
+  i.1: int = phi i.0 i.2 .__b0 .loop_body;
+  cond.0: bool = phi __undefined cond.1 .__b0 .loop_body;
+  v.0: int = phi __undefined v.1 .__b0 .loop_body;
+  p.0: ptr<int> = phi __undefined p.1 .__b0 .loop_body;
+  cond.1: bool = lt i.1 size;
+  br cond.1 .loop_body .loop_exit;
+.loop_body:
+  p.1: ptr<int> = ptradd arr i.1;
+  v.1: int = load p.1;
+  print v.1;
+  i.2: int = add i.1 one.0;
+  jmp .loop_cond;
+.loop_exit:
+  ret;
+}
+@main(rows: int, cols: int, degree: int) {
+._special_entry_for_ssa:
+  one.0: int = const 1;
+  rptr_len.0: int = add rows one.0;
+  nnz.0: int = mul rows degree;
+  csr_rowptr.0: ptr<int> = alloc rptr_len.0;
+  csr_colidx.0: ptr<int> = alloc nnz.0;
+  csr_values.0: ptr<int> = alloc nnz.0;
+  call @gen_uniform_csr rows cols degree csr_rowptr.0 csr_colidx.0 csr_values.0;
+  call @print_arr csr_rowptr.0 rptr_len.0;
+  call @print_arr csr_colidx.0 nnz.0;
+  call @print_arr csr_values.0 nnz.0;
+  vec.0: ptr<int> = alloc cols;
+  call @gen_vec cols vec.0;
+  call @print_arr vec.0 cols;
+  res.0: ptr<int> = alloc rows;
+  call @csr_spmv rows cols csr_rowptr.0 csr_colidx.0 csr_values.0 vec.0 res.0;
+  call @print_arr res.0 rows;
+  free csr_rowptr.0;
+  free csr_colidx.0;
+  free csr_values.0;
+  free vec.0;
+  free res.0;
+}

@@ -6,5 +6,10 @@
     c: ptr<int> = ptradd a zero;
 
     d: ptr<ptr<int>> = alloc four;
+    store d a;
     e: ptr<int> = load d;
+
+    free a;
+    free b;
+    free d;
 }

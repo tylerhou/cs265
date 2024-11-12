@@ -13,14 +13,21 @@
 .t:
     store a ten;
     store b ten;
+    store c twenty;
     jmp .end;
 .f:
     store a ten;
     store b twenty;
+    store c ten;
     jmp .end;
 .end:
     al: int = load a;
     bl: int = load b;
-    print a;
-    print b;
+    cl: int = load c;
+    print al;
+    print bl;
+    print cl;
+
+    free a;
+    free b;
 }

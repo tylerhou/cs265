@@ -8,16 +8,16 @@ pipeline = [
     "brili -p {args}",
 ]
 
-[runs.valnum-constprop-dce]
-pipeline = [
-    "bril2json",
-    "_build/install/default/bin/opt ssa valnum constprop dce",
-    "brili -p {args}",
-]
-
-[runs.vbe-ae-cp-dce]
+[runs.no-mem]
 pipeline = [
     "bril2json",
     "_build/install/default/bin/opt ssa vbe ae cp constprop dce",
+    "brili -p {args}",
+]
+
+[runs.mem]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt ssa store_to_load vbe ae cp constprop dce",
     "brili -p {args}",
 ]

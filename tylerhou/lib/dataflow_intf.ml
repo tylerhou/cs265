@@ -30,6 +30,7 @@ module type S = sig
     type instr_with_lattice =
       { before : lattice
       ; instr : Bril.Instr.t
+      ; point : Program_point.t
       ; after : lattice
       }
     [@@deriving compare, equal, sexp_of]

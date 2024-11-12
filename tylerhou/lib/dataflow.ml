@@ -9,13 +9,15 @@ module Make (Transfer : Transfer) = struct
       { instructions : (Bril.Instr.t * Lattice.t) list
           (* An instruction and the state before (after) the instruction executes in a forward (backward) analysis *)
       ; block_end : Lattice.t
-      (* The state after (before) the last (first) instruction in a forward (backward) analysis *)
+          (* The state after (before) the last (first) instruction in a forward (backward) analysis *)
+      ; label : string
       }
     [@@deriving compare, equal, sexp_of]
 
     type instr_with_lattice =
       { before : Transfer.Lattice.t
       ; instr : Bril.Instr.t
+      ; point : Program_point.t
       ; after : Transfer.Lattice.t
       }
     [@@deriving compare, equal, sexp_of]
@@ -33,11 +35,15 @@ module Make (Transfer : Transfer) = struct
 
     let instrs_with_lattice (t : t) : instr_with_lattice list =
       let output, _ =
-        List.fold
-          (List.rev t.instructions)
-          ~init:([], t.block_end)
-          ~f:(fun (output, after) (instr, before) ->
-            { before; instr; after } :: output, before)
+        t.instructions
+        |> List.mapi ~f:Tuple2.create
+        |> List.rev
+        |> List.fold
+             ~init:([], t.block_end)
+             ~f:(fun (output, after) (i, (instr, before)) ->
+               ( { before; instr; point = { block = t.label; instruction = i }; after }
+                 :: output
+               , before ))
       in
       output
     ;;
@@ -62,9 +68,10 @@ module Make (Transfer : Transfer) = struct
          | `Forwards -> func.order
          | `Backwards -> List.rev func.order)
     ; blocks =
-        Map.map func.blocks ~f:(fun instrs : Block.t ->
+        Map.mapi func.blocks ~f:(fun ~key:label ~data:instrs : Block.t ->
           { instructions = List.map instrs ~f:(fun ins -> ins, Lattice.bottom)
           ; block_end = Lattice.bottom
+          ; label
           })
     ; preds =
         (match Transfer.direction with
@@ -119,7 +126,7 @@ module Make (Transfer : Transfer) = struct
             (* eprint_s [%message "after transfer" (after : Lattice.t)]; *)
             after, (instr, before) :: instrs)
       in
-      { instructions; block_end }
+      { instructions; block_end; label }
     in
     match state.worklist with
     | [] -> `Done state.blocks

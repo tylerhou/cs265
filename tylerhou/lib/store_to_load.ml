@@ -3,19 +3,21 @@ open! Core
 module Pointer_contains = struct
   module Value = struct
     type t =
+      | Bottom
       | Value of Var.t
       | Multiple_values (* Top *)
     [@@deriving compare, equal, sexp_of]
 
     let join (left : t) (right : t) : t =
       match left, right with
+      | Bottom, v | v, Bottom -> v
       | Value l, Value r -> if Var.equal l r then left else Multiple_values
       | Multiple_values, _ -> Multiple_values
       | _, Multiple_values -> Multiple_values
     ;;
   end
 
-  type t = Value.t Var.Map.t [@@deriving compare, equal, sexp_of]
+  type t = Value.t Points_to.Location.Map.t [@@deriving compare, equal, sexp_of]
 
   let join (t1 : t) (t2 : t) =
     Map.merge t1 t2 ~f:(fun ~key:_ elt ->
@@ -25,8 +27,8 @@ module Pointer_contains = struct
          | `Left v | `Right v -> v))
   ;;
 
-  let bottom = Var.Map.empty
-  let init = Var.Map.empty
+  let bottom = Points_to.Location.Map.empty
+  let init = Points_to.Location.Map.empty
 end
 
 module Transfer (Points_to_analysis : sig
@@ -53,11 +55,14 @@ struct
          in
          List.fold targets ~init:before ~f:(fun contains target ->
            Map.update contains target ~f:(fun existing ->
-             let stored : Pointer_contains.Value.t = Value arg in
-             match existing with
-             | None -> stored
-             | Some existing -> Pointer_contains.Value.join existing stored))
+             match existing, target with
+             | None, _ -> Value arg
+             | Some _, First _ -> Value arg
+             | Some existing, Rest _ -> Pointer_contains.Value.join existing (Value arg)))
        | None -> before)
+    | Call _ ->
+      (* Clobber all memory values. *)
+      Pointer_contains.bottom
     | _ -> before
   ;;
 
@@ -81,12 +86,36 @@ let run func =
         block
         |> Block.to_list
         |> List.map
-             ~f:(fun ({ before; instr; _ } : Block.instr_with_lattice) : Bril.Instr.t ->
+             ~f:
+               (fun
+                 ({ before; instr; point; _ } : Block.instr_with_lattice)
+                 : Bril.Instr.t
+               ->
                match instr with
                | Load (dest, ptr) ->
-                 (match Map.find before ptr with
-                  | Some (Value v) -> Unary (dest, Id, v)
-                  | _ -> instr)
+                 (match
+                    let%tydi { before; _ } = Map.find_exn analysis_by_point point in
+                    Map.find before ptr
+                  with
+                  | None -> instr
+                  | Some points_to ->
+                    let targets =
+                      match points_to with
+                      | Exactly locations -> Set.to_list locations
+                      | All_memory_locations -> Map.keys before
+                    in
+                    let value =
+                      List.fold
+                        targets
+                        ~init:Pointer_contains.Value.Bottom
+                        ~f:(fun value target ->
+                          match Map.find before target with
+                          | None -> value
+                          | Some existing -> Pointer_contains.Value.join value existing)
+                    in
+                    (match value with
+                     | Value v -> Unary (dest, Id, v)
+                     | _ -> instr))
                | _ -> instr)
       in
       instrs)

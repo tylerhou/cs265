@@ -1,8 +1,20 @@
 open! Core
 
+module Location = struct
+  module T = struct
+    type t =
+      | First of Var.t
+      | Rest of Var.t
+    [@@deriving compare, equal, sexp_of]
+  end
+
+  include T
+  include Comparable.Make_plain (T)
+end
+
 module Points_to = struct
   type target =
-    | Exactly of Var.Set.t
+    | Exactly of Location.Set.t
     | All_memory_locations
   [@@deriving compare, equal, sexp_of]
 
@@ -12,11 +24,15 @@ module Points_to = struct
   let init : t = Var.Map.empty
 
   let join (t1 : t) (t2 : t) : t =
-    Map.merge t1 t2 ~f:(fun ~key:_ data ->
+    Map.merge t1 t2 ~f:(fun ~key:var data ->
       match data with
       | `Right target | `Left target -> Some target
       | `Both (l, r) ->
-        if not (equal_target l r) then failwith "program not in ssa form" else Some l)
+        if not (equal_target l r)
+        then
+          Error.raise_s
+            [%message "program not in ssa form" (var : string) (l : target) (r : target)]
+        else Some l)
   ;;
 
   let union (tgt1 : target) (tgt2 : target) : target =
@@ -37,19 +53,29 @@ module Transfer = struct
        | None -> points_to)
     | PtrAdd ((dest, _), base, _) ->
       (match Map.find points_to base with
-       | Some existing -> Map.set points_to ~key:dest ~data:existing
+       | Some existing ->
+         let target : Points_to.target =
+           match existing with
+           | Exactly locations ->
+             Exactly
+               (Location.Set.map locations ~f:(fun loc ->
+                  match loc with
+                  | First var | Rest var -> Rest var))
+           | All_memory_locations -> All_memory_locations
+         in
+         Map.set points_to ~key:dest ~data:target
        | _ -> points_to)
     | Alloc ((dest, _), _) ->
-      Map.set points_to ~key:dest ~data:(Exactly (Var.Set.singleton dest))
+      Map.set points_to ~key:dest ~data:(Exactly (Location.Set.singleton (First dest)))
     | Load ((dest, _), _) -> Map.set points_to ~key:dest ~data:All_memory_locations
-    | Phi ((dest, _), args) ->
+    | Phi ((dest, PtrType _), args) ->
       let targets =
         args
         |> List.map ~f:(fun (_, arg) ->
           match Map.find points_to arg with
           | Some s -> s
-          | None -> Exactly Var.Set.empty)
-        |> List.fold ~init:(Lattice.Exactly Var.Set.empty) ~f:Points_to.union
+          | None -> Exactly Location.Set.empty)
+        |> List.fold ~init:(Lattice.Exactly Location.Set.empty) ~f:Points_to.union
       in
       Map.set points_to ~key:dest ~data:targets
     | _ -> points_to
