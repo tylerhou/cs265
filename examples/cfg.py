@@ -38,7 +38,7 @@ def successors(instr):
     branch, or return).
     """
     if instr['op'] in ('jmp', 'br'):
-        return instr['labels']
+        return [l['name'] for l in instr['labels']]
     elif instr['op'] == 'ret':
         return []  # No successors to an exit block.
     else:
@@ -56,14 +56,14 @@ def add_terminators(blocks):
                 block.append({'op': 'ret', 'args': []})
             else:
                 dest = list(blocks.keys())[i + 1]
-                block.append({'op': 'jmp', 'labels': [dest]})
+                block.append({'op': 'jmp', 'labels': [{'name': dest}]})
         elif block[-1]['op'] not in TERMINATORS:
             if i == len(blocks) - 1:
                 block.append({'op': 'ret', 'args': []})
             else:
                 # Otherwise, jump to the next block.
                 dest = list(blocks.keys())[i + 1]
-                block.append({'op': 'jmp', 'labels': [dest]})
+                block.append({'op': 'jmp', 'labels': [{'name': dest}]})
 
 
 def add_entry(blocks):
@@ -77,8 +77,10 @@ def add_entry(blocks):
 
     # Check for any references to the label.
     for instr in flatten(blocks.values()):
-        if 'labels' in instr and first_lbl in instr['labels']:
-            break
+        if 'labels' in instr:
+            label_names = [l['name'] for l in instr['labels']]
+            if first_lbl in label_names:
+                break
     else:
         return
 

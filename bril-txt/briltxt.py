@@ -30,9 +30,11 @@ arg: IDENT ":" type
 const.4: IDENT [tyann] "=" "const" lit ";"
 vop.3: IDENT [tyann] "=" op ";"
 eop.2: op ";"
-label.1: LABEL ":"
+label.1: LABEL ["(" arg_list? ")"] ":"
 
-op: IDENT (FUNC | LABEL | IDENT)*
+label_with_args: LABEL [ "(" [IDENT ("," IDENT)*] ")" ]
+op: IDENT (FUNC | label_with_args | IDENT )*
+
 
 ?tyann: ":" type
 
@@ -171,11 +173,18 @@ class JSONTransformer(lark.Transformer):
         labels = []
         args = []
         for item in items:
-            if item.type == 'FUNC':
+            if isinstance(item, lark.Tree) and item.data == "label_with_args":
+                name, *label_args = item.children
+                label_args = [a for a in label_args if a is not None]
+                label = { 'name': str(name)[1:] }
+                if label_args:
+                    label['args'] = label_args
+                labels.append(label);
+            elif item.type == 'FUNC':
                 funcs.append(str(item)[1:])
             elif item.type == 'LABEL':
-                labels.append(str(item)[1:])
-            else:
+                labels.append({ 'name': str(item)[1:] })
+            elif item is not None:
                 args.append(str(item))
 
         out = {'op': opcode}
@@ -194,12 +203,16 @@ class JSONTransformer(lark.Transformer):
         return op
 
     def label(self, items):
-        name, = items
+        name, args = items
         out = {
             'label': str(name)[1:]  # Strip `.`.
         }
+        if args:
+            out['args'] = args
+
         if self.include_pos:
             out['pos'] = _pos(name)
+
         return out
 
     def int(self, items):
@@ -262,6 +275,16 @@ def value_to_str(type, value):
         return str(value).lower()
 
 
+def label_to_string(label):
+    args = ''
+    if label.get('args'):
+        args = '({})'.format(
+            ', '.join(arg for arg in label['args'])
+        )
+
+    return '.{}{}'.format(label['name'], args)
+
+
 def instr_to_string(instr):
     if instr['op'] == 'const':
         tyann = ': {}'.format(type_to_str(instr['type'])) \
@@ -281,7 +304,7 @@ def instr_to_string(instr):
             rhs += ' {}'.format(' '.join(instr['args']))
         if instr.get('labels'):
             rhs += ' {}'.format(' '.join(
-                '.{}'.format(f) for f in instr['labels']
+                label_to_string(l) for l in instr['labels']
             ))
         if 'dest' in instr:
             tyann = ': {}'.format(type_to_str(instr['type'])) \
@@ -299,10 +322,6 @@ def print_instr(instr):
     print('  {};'.format(instr_to_string(instr)))
 
 
-def print_label(label):
-    print('.{}:'.format(label['label']))
-
-
 def args_to_string(args):
     if args:
         return '({})'.format(', '.join(
@@ -311,6 +330,13 @@ def args_to_string(args):
         ))
     else:
         return ''
+
+
+def print_label(label):
+    print('.{}{}:'.format(
+        label['label'],
+        args_to_string(label.get('args', []))
+    ))
 
 
 def print_func(func):

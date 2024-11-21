@@ -1,0 +1,154 @@
+{
+  "functions": [
+    {
+      "args": [
+        {
+          "name": "cond",
+          "type": "bool"
+        }
+      ],
+      "instrs": [
+        {
+          "label": "entry"
+        },
+        {
+          "dest": "zero",
+          "op": "const",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "dest": "one",
+          "op": "const",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "args": [
+            "cond"
+          ],
+          "labels": [
+            {
+              "args": [
+                "zero"
+              ],
+              "name": "thn"
+            },
+            {
+              "args": [
+                "one"
+              ],
+              "name": "els"
+            }
+          ],
+          "op": "br"
+        },
+        {
+          "args": [
+            {
+              "name": "a",
+              "type": "int"
+            },
+            {
+              "name": "b",
+              "type": "int"
+            }
+          ],
+          "label": "thn"
+        },
+        {
+          "dest": "b",
+          "op": "const",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "labels": [
+            {
+              "args": [
+                "b",
+                "a"
+              ],
+              "name": "end"
+            }
+          ],
+          "op": "jmp"
+        },
+        {
+          "args": [
+            {
+              "name": "a",
+              "type": "int"
+            },
+            {
+              "name": "b",
+              "type": "int"
+            }
+          ],
+          "label": "els"
+        },
+        {
+          "dest": "b",
+          "op": "const",
+          "type": "int",
+          "value": 3
+        },
+        {
+          "labels": [
+            {
+              "args": [
+                "b",
+                "a"
+              ],
+              "name": "end"
+            }
+          ],
+          "op": "jmp"
+        },
+        {
+          "args": [
+            {
+              "name": "a",
+              "type": "int"
+            },
+            {
+              "name": "b",
+              "type": "int"
+            }
+          ],
+          "label": "end"
+        },
+        {
+          "args": [
+            "a",
+            "b"
+          ],
+          "op": "print"
+        },
+        {
+          "labels": [
+            {
+              "name": "end1"
+            }
+          ],
+          "op": "jmp"
+        },
+        {
+          "label": "end1"
+        },
+        {
+          "labels": [
+            {
+              "name": "end2"
+            }
+          ],
+          "op": "jmp"
+        },
+        {
+          "label": "end2"
+        }
+      ],
+      "name": "main"
+    }
+  ]
+}

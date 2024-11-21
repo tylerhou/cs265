@@ -220,14 +220,16 @@ function checkSig(env: Env, instr: bril.Operation, psig: Signature | PolySignatu
   }
 
   // Check labels.
+  // TODO(tylerhou): Check that the arguments match the destination block arguments?
   let labs = instr.labels ?? [];
   let labCount = sig.labels ?? 0;
   if (labs.length !== labCount) {
     err(`${instr.op} needs ${labCount} labels; found ${labs.length}`, instr.pos);
   } else {
     for (let lab of labs) {
-      if (!env.labels.has(lab)) {
-        err(`label .${lab} undefined`, instr.pos);
+      let { name } = lab;
+      if (!env.labels.has(name)) {
+        err(`label .${name} undefined`, instr.pos);
       }
     }
   }

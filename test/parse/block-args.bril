@@ -1,0 +1,20 @@
+# ARGS: true
+@main(cond: bool) {
+.entry:
+  zero: int = const 0;
+  one: int = const 1;
+  br cond .thn(zero) .els(one);
+.thn(a: int, b: int):
+  b: int = const 2;
+  jmp .end(b, a);  # swap arguments
+
+.els(a: int, b: int):
+  b: int = const 3;
+  jmp .end(b, a);  # swap arguments
+.end(a: int, b: int):
+  print a b;
+  jmp .end1;  # should not have null in the JSON
+.end1:
+  jmp .end2();  # also should not have null in the JSON
+.end2:
+}

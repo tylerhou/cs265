@@ -272,14 +272,14 @@ function getChar(instr: bril.Operation, env: Env, index: number): string {
   return getArgument(instr, env, index, 'char') as string;
 }
 
-function getLabel(instr: bril.Operation, index: number): bril.Ident {
+function getLabelName(instr: bril.Operation, index: number): bril.Ident {
   if (!instr.labels) {
     throw error(`missing labels; expected at least ${index+1}`);
   }
   if (instr.labels.length <= index) {
     throw error(`expecting ${index+1} labels; found ${instr.labels.length}`);
   }
-  return instr.labels[index];
+  return instr.labels[index].name;
 }
 
 function getFunc(instr: bril.Operation, index: number): bril.Ident {
@@ -608,15 +608,15 @@ function evalInstr(instr: bril.Instruction, state: State): Action {
   }
 
   case "jmp": {
-    return {"action": "jump", "label": getLabel(instr, 0)};
+    return {"action": "jump", "label": getLabelName(instr, 0)};
   }
 
   case "br": {
     let cond = getBool(instr, state.env, 0);
     if (cond) {
-      return {"action": "jump", "label": getLabel(instr, 0)};
+      return {"action": "jump", "label": getLabelName(instr, 0)};
     } else {
-      return {"action": "jump", "label": getLabel(instr, 1)};
+      return {"action": "jump", "label": getLabelName(instr, 1)};
     }
   }
 
@@ -690,7 +690,7 @@ function evalInstr(instr: bril.Instruction, state: State): Action {
     if (state.lastblock === null) {
       throw error(`phi node executed with no last label`);
     }
-    let idx = labels.indexOf(state.lastblock.label);
+    let idx = labels.findIndex((l) => l.name == state.lastblock!.label);
     if (idx === -1) {
       // Last label not handled. Leave uninitialized.
       state.env.delete(instr.dest);
@@ -720,7 +720,7 @@ function evalInstr(instr: bril.Instruction, state: State): Action {
     if (getBool(instr, state.env, 0)) {
       return NEXT;
     } else {
-      return {"action": "abort", "label": getLabel(instr, 0)};
+      return {"action": "abort", "label": getLabelName(instr, 0)};
     }
   }
 

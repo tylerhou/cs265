@@ -28,7 +28,9 @@
             "b"
           ],
           "labels": [
-            "failed"
+            {
+              "name": "failed"
+            }
           ],
           "op": "guard"
         },

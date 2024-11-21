@@ -99,7 +99,7 @@ def insert_phis(blocks, phi_args, phi_dests, types):
                 'op': 'phi',
                 'dest': phi_dests[block][dest],
                 'type': types[dest],
-                'labels': [p[0] for p in pairs],
+                'labels': [ { 'name': p[0] } for p in pairs],
                 'args': [p[1] for p in pairs],
             }
             instrs.insert(0, phi)

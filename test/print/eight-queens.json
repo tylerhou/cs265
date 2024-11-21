@@ -119,8 +119,12 @@
             "ret_cond"
           ],
           "labels": [
-            "next.ret",
-            "for.cond"
+            {
+              "name": "next.ret"
+            },
+            {
+              "name": "for.cond"
+            }
           ],
           "op": "br"
         },
@@ -159,8 +163,12 @@
             "for_cond_0"
           ],
           "labels": [
-            "for.body",
-            "next.ret.1"
+            {
+              "name": "for.body"
+            },
+            {
+              "name": "next.ret.1"
+            }
           ],
           "op": "br"
         },
@@ -202,8 +210,12 @@
             "is_valid"
           ],
           "labels": [
-            "rec.func",
-            "next.loop"
+            {
+              "name": "rec.func"
+            },
+            {
+              "name": "next.loop"
+            }
           ],
           "op": "br"
         },
@@ -247,7 +259,9 @@
         },
         {
           "labels": [
-            "for.cond"
+            {
+              "name": "for.cond"
+            }
           ],
           "op": "jmp"
         },
@@ -333,8 +347,12 @@
             "for_cond"
           ],
           "labels": [
-            "for.body",
-            "ret.end"
+            {
+              "name": "for.body"
+            },
+            {
+              "name": "ret.end"
+            }
           ],
           "op": "br"
         },
@@ -399,8 +417,12 @@
             "eq_cond_0"
           ],
           "labels": [
-            "true.ret.0",
-            "false.else"
+            {
+              "name": "true.ret.0"
+            },
+            {
+              "name": "false.else"
+            }
           ],
           "op": "br"
         },
@@ -475,8 +497,12 @@
             "eq_cond_12"
           ],
           "labels": [
-            "true.ret.1",
-            "false.loop"
+            {
+              "name": "true.ret.1"
+            },
+            {
+              "name": "false.loop"
+            }
           ],
           "op": "br"
         },
@@ -503,7 +529,9 @@
         },
         {
           "labels": [
-            "for.cond"
+            {
+              "name": "for.cond"
+            }
           ],
           "op": "jmp"
         },

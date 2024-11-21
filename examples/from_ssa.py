@@ -22,7 +22,7 @@ def func_from_ssa(func):
 
                     # Insert a copy in the predecessor block, before the
                     # terminator.
-                    pred = blocks[label]
+                    pred = blocks[label['name']]
                     pred.insert(-1, {
                         'op': 'id',
                         'type': type,

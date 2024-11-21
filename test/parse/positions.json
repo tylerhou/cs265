@@ -24,7 +24,9 @@
         },
         {
           "labels": [
-            "label"
+            {
+              "name": "label"
+            }
           ],
           "op": "jmp",
           "pos": {

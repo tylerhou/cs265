@@ -33,7 +33,7 @@ export class Builder {
    * omitted, a fresh variable is chosen automatically.
    */
   buildValue(op: bril.ValueOpCode, type: bril.Type,
-             args: string[], funcs?: string[], labels?: string[],
+             args: string[], funcs?: string[], labels?: bril.LabelAndArgs[],
              dest?: string) {
     dest = dest || this.freshVar();
     let instr: bril.ValueOperation = { op, dest, type, args, funcs, labels };
@@ -45,7 +45,7 @@ export class Builder {
    * Build a non-value-producing (side-effecting) operation instruction.
    */
   buildEffect(op: bril.EffectOpCode,
-              args: string[], funcs?: string[], labels?: string[]) {
+              args: string[], funcs?: string[], labels?: bril.LabelAndArgs[]) {
     let instr: bril.EffectOperation = { op, args, funcs, labels };
     this.insert(instr);
     return instr;
@@ -109,9 +109,15 @@ export class Builder {
   /**
    * Add a label to the function at the current position.
    */
-  buildLabel(name: string) {
-    let label = {label: name};
-    this.insert(label);
+  buildLabel(label: bril.LabelAndArgs) {
+    this.insert({ label: label.name });
+  }
+
+  /**
+   * Construct a label object from a name.
+   */
+  label(name: string): bril.LabelAndArgs {
+    return { name }
   }
 
   /**

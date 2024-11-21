@@ -30,10 +30,15 @@ export type Position = {row: number, col: number};
 /**
  * Common fields in any operation.
  */
+export interface LabelAndArgs {
+  name: Ident;
+  args?: Ident[];
+}
+
 interface Op {
   args?: Ident[];
   funcs?: Ident[];
-  labels?: Ident[];
+  labels?: LabelAndArgs[];
   pos?: Position;
 }
 
@@ -118,6 +123,7 @@ export type OpCode = ValueOpCode | EffectOpCode;
  */
 export interface Label {
   label: Ident;
+  args?: Argument[];
   pos?: Position;
 }
 

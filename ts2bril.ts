@@ -204,9 +204,9 @@ function emitBril(prog: ts.Node, checker: ts.TypeChecker): bril.Program {
 
         // Label names.
         let sfx = builder.freshSuffix();
-        let thenLab = "then" + sfx;
-        let elseLab = "else" + sfx;
-        let endLab = "endif" + sfx;
+        let thenLab = builder.label("then" + sfx);
+        let elseLab = builder.label("else" + sfx);
+        let endLab = builder.label("endif" + sfx);
 
         // Branch.
         let cond = emitExpr(if_.expression);
@@ -237,9 +237,9 @@ function emitBril(prog: ts.Node, checker: ts.TypeChecker): bril.Program {
 
         // Label names.
         let sfx = builder.freshSuffix();
-        let condLab = "for.cond" + sfx;
-        let bodyLab = "for.body" + sfx;
-        let endLab = "for.end" + sfx;
+        let condLab = builder.label("for.cond" + sfx);
+        let bodyLab = builder.label("for.body" + sfx);
+        let endLab = builder.label("for.end" + sfx);
 
         // Initialization.
         if (for_.initializer) {
