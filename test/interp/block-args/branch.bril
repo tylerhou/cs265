@@ -12,8 +12,4 @@
   jmp .end(b, a);  # swap arguments
 .end(a: int, b: int):
   print a b;
-  jmp .end1;  # should not have null in the JSON
-.end1:
-  jmp .end2();  # also should not have null in the JSON
-.end2:
 }

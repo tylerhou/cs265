@@ -244,7 +244,7 @@ function getPtr(instr: bril.Operation, env: Env, index: number): Pointer {
   return val;
 }
 
-function getArgument(instr: bril.Operation, env: Env, index: number, typ?: bril.Type) {
+function getArgument(instr: bril.Operation, env: Env, index: number, typ?: bril.Type): Value {
   let args = instr.args || [];
   if (args.length <= index) {
     throw error(`${instr.op} expected at least ${index+1} arguments; got ${args.length}`);
@@ -252,6 +252,26 @@ function getArgument(instr: bril.Operation, env: Env, index: number, typ?: bril.
   let val = get(env, args[index]);
   if (typ && !typeCheck(val, typ)) {
     throw error(`${instr.op} argument ${index} must be a ${typ}`);
+  }
+  return val;
+}
+
+function getBlockArgument(
+  instr: bril.Label,
+  blockArgs: (Value | undefined)[],
+  index: number,
+  typ: bril.Type
+): Value | undefined {
+  if (blockArgs.length <= index) {
+    throw error(`label ${instr.label} expected at least ${index+1} arguments; got ${blockArgs.length}`);
+  }
+  let val = blockArgs[index];
+  if (val === undefined) {
+    return undefined;
+  }
+
+  if (!typeCheck(val, typ)) {
+    throw error(`label ${instr.label} argument ${index} must be a ${typ}`);
   }
   return val;
 }
@@ -272,14 +292,14 @@ function getChar(instr: bril.Operation, env: Env, index: number): string {
   return getArgument(instr, env, index, 'char') as string;
 }
 
-function getLabelName(instr: bril.Operation, index: number): bril.Ident {
+function getLabel(instr: bril.Operation, index: number): bril.LabelAndArgs {
   if (!instr.labels) {
     throw error(`missing labels; expected at least ${index+1}`);
   }
   if (instr.labels.length <= index) {
     throw error(`expecting ${index+1} labels; found ${instr.labels.length}`);
   }
-  return instr.labels[index].name;
+  return instr.labels[index];
 }
 
 function getFunc(instr: bril.Operation, index: number): bril.Ident {
@@ -298,11 +318,11 @@ function getFunc(instr: bril.Operation, index: number): bril.Ident {
  */
 type Action =
   {"action": "next"} |  // Normal execution: just proceed to next instruction.
-  {"action": "jump", "label": bril.Ident} |
+  {"action": "jump", "label": bril.LabelAndArgs} |
   {"action": "end", "ret": Value | null} |
   {"action": "speculate"} |
   {"action": "commit"} |
-  {"action": "abort", "label": bril.Ident};
+  {"action": "abort", "label": bril.LabelAndArgs};
 let NEXT: Action = {"action": "next"};
 
 /**
@@ -325,6 +345,12 @@ type State = {
     // (https://github.com/sampsyo/bril/issues/330)
     endenv: Env,
   },
+
+  // This is set during a instruction that transfers control to another label
+  // (e.g. jmp, br). It is null if no such control transfer instruction has
+  // been interpreted. We explicitly undefined values in block argumentsj
+  // because they are useful in some programs (e.g. loop headers).
+  blockArguments: (Value | undefined)[] | null,
 
   // For speculation: the state at the point where speculation began.
   specparent: State | null,
@@ -370,6 +396,7 @@ function evalCall(instr: bril.Operation, state: State): Action {
     funcs: state.funcs,
     icount: state.icount,
     lastblock: null,
+    blockArguments: null,
     curlabel: null,
     specparent: null,  // Speculation not allowed.
   }
@@ -608,15 +635,15 @@ function evalInstr(instr: bril.Instruction, state: State): Action {
   }
 
   case "jmp": {
-    return {"action": "jump", "label": getLabelName(instr, 0)};
+    return {"action": "jump", "label": getLabel(instr, 0)};
   }
 
   case "br": {
     let cond = getBool(instr, state.env, 0);
     if (cond) {
-      return {"action": "jump", "label": getLabelName(instr, 0)};
+      return {"action": "jump", "label": getLabel(instr, 0)};
     } else {
-      return {"action": "jump", "label": getLabelName(instr, 1)};
+      return {"action": "jump", "label": getLabel(instr, 1)};
     }
   }
 
@@ -690,7 +717,7 @@ function evalInstr(instr: bril.Instruction, state: State): Action {
     if (state.lastblock === null) {
       throw error(`phi node executed with no last label`);
     }
-    let idx = labels.findIndex((l) => l.name == state.lastblock!.label);
+    let idx = labels.findIndex(({ name }) => name == state.lastblock!.label);
     if (idx === -1) {
       // Last label not handled. Leave uninitialized.
       state.env.delete(instr.dest);
@@ -720,7 +747,7 @@ function evalInstr(instr: bril.Instruction, state: State): Action {
     if (getBool(instr, state.env, 0)) {
       return NEXT;
     } else {
-      return {"action": "abort", "label": getLabelName(instr, 0)};
+      return {"action": "abort", "label": getLabel(instr, 0)};
     }
   }
 
@@ -835,13 +862,20 @@ function evalFunc(func: bril.Function, state: State): Value | null {
         // Search for the label and transfer control.
         for (i = 0; i < func.instrs.length; ++i) {
           let sLine = func.instrs[i];
-          if ('label' in sLine && sLine.label === action.label) {
+          if ('label' in sLine && sLine.label === action.label.name) {
+            // Store the block arguments to be read by the next label.
+            if (action.label.args !== undefined) {
+              state.blockArguments = action.label.args.map((arg) => {
+                return state.env.get(arg);
+              })
+            }
+
             --i;  // Execute the label next.
             break;
           }
         }
         if (i === func.instrs.length) {
-          throw error(`label ${action.label} not found`);
+          throw error(`label ${action.label.name} not found`);
         }
       }
     } else if ('label' in line) {
@@ -852,6 +886,19 @@ function evalFunc(func: bril.Function, state: State): Value | null {
           endenv: new Map(state.env),
         };
       }
+
+      // Assign stored block arguments. Otherwise, leave them undefined.
+      if (state.blockArguments !== null) {
+        let args = line.args || [];
+        for (let i = 0; i < args.length; ++i) {
+          let value = getBlockArgument(line, state.blockArguments, i, args[i].type);
+          if (value !== undefined) {
+            state.env.set(args[i].name, value);
+          }
+        }
+        state.blockArguments = null;
+      }
+
       state.curlabel = line.label;
     }
   }
@@ -955,6 +1002,7 @@ function evalProg(prog: bril.Program) {
     env: newEnv,
     icount: BigInt(0),
     lastblock: null,
+    blockArguments: null,
     curlabel: null,
     specparent: null,
   }

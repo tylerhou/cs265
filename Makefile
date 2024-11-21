@@ -9,6 +9,7 @@ TESTS := test/parse/*.bril \
 	test/interp*/mixed/*.bril \
 	test/interp*/spec*/*.bril \
 	test/interp*/ssa*/*.bril \
+	test/interp*/block-args*/*.bril \
 	examples/test/*/*.bril \
 	benchmarks/core/*.bril \
 	benchmarks/float/*.bril \

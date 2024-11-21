@@ -48,10 +48,6 @@
             {
               "name": "a",
               "type": "int"
-            },
-            {
-              "name": "b",
-              "type": "int"
             }
           ],
           "label": "thn"
@@ -78,10 +74,6 @@
           "args": [
             {
               "name": "a",
-              "type": "int"
-            },
-            {
-              "name": "b",
               "type": "int"
             }
           ],

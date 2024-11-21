@@ -1,0 +1,18 @@
+# ARGS: true
+@main(cond: bool) {
+.entry:
+  zero: int = const 0;
+  one: int = const 1;
+  jmp .b1(zero, one);
+.b1(l: int, r: int):
+  print l r;
+  jmp .b2(l, r);
+.b2(l: int, r: int):
+  print l r;
+  jmp .b3(r, l);
+.b3(l: int, r: int):  # flipped
+  print l r;
+  jmp .b4(l, l, l, l, l, l, l, l, l, l);
+.b4(a0: int, a1: int, a2: int, a3: int, a4: int, a5: int, a6: int, a7: int, a8: int, a9: int):
+  print a0 a1 a2 a3 a4 a5 a6 a7 a8 a9;
+}

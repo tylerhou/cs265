@@ -1,0 +1,6 @@
+@main {
+.entry:
+    jmp .foo;
+.foo(a: int):
+    print a;
+}

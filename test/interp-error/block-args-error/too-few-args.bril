@@ -1,0 +1,10 @@
+@main {
+.entry:
+    a: int = const 1;
+    b: int = const 2;
+    jmp .foo(a, b);
+.foo(a: int, b: int, c: int):
+    print a;
+    print b;
+    print c;
+}
