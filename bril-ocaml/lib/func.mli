@@ -1,11 +1,22 @@
 open! Core
 open! Common
 
+module Block : sig
+  type t = {
+    header : Instr.header;
+    body : Instr.body list;
+    terminator: Instr.terminator;
+  }
+  [@@deriving compare, equal, sexp_of]
+
+  val instrs : t -> Instr.t list
+end
+
 type t = {
   name : string;
   args : Dest.t list;
   ret_type : Bril_type.t option;
-  blocks : Instr.t list String.Map.t;
+  blocks : Block.t String.Map.t;
   order : string list;
   preds : string list String.Map.t;
   succs : string list String.Map.t;
