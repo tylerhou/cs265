@@ -32,12 +32,18 @@ let instrs { blocks; order; _ } =
 let process_instrs instrs =
   let add_block ~header ~rev_body ~terminator ~blocks : Block.t list =
     let block_name i = sprintf "__b%d" i in
-    let header : Instr.header =
+    let next_block : Block.t option =
       match header with
-      | None -> Label (block_name (List.length blocks + 1), [])
-      | Some header -> header
+      | None ->
+        if List.is_empty rev_body then None
+        else
+          let header : Instr.header = Label (block_name (List.length blocks + 1), []) in
+          Some { header; body = List.rev rev_body; terminator }
+      | Some header -> Some { header; body = List.rev rev_body; terminator }
     in
-    { header; body = List.rev rev_body; terminator } :: blocks
+    match next_block with
+    | Some block -> block :: blocks
+    | None -> blocks
   in
   let (header, rev_body, blocks) =
     List.fold
@@ -52,8 +58,9 @@ let process_instrs instrs =
         | Body body_instr -> (header, body_instr :: rev_body, blocks))
   in
   let blocks =
-    if List.is_empty rev_body then blocks
-    else add_block ~header ~rev_body ~terminator:(Ret None) ~blocks
+    (if List.is_empty rev_body then blocks
+     else add_block ~header ~rev_body ~terminator:(Ret None) ~blocks)
+    |> List.rev
   in
   let order = List.map blocks ~f:(fun { header = Label (name, _); _ } -> name) in
   let succs =

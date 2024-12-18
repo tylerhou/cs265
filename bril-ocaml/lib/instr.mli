@@ -38,7 +38,7 @@ type t =
 
 val dest : t -> Dest.t option
 val set_dest : Dest.t option -> body -> body
-val args : t -> arg list
+val args : t -> arg list option
 val set_args : arg list -> t -> t
 val of_json : Yojson.Basic.t -> t
 val to_json : t -> Yojson.Basic.t

@@ -134,28 +134,28 @@ let set_dest dest t =
     failwithf !"Cannot [set_dest] on instruction %{to_string} with dest %{Sexp}" (Body t) dest ()
 
 let args = function
-  | Body (Binary (_, _, arg1, arg2)) -> [ arg1; arg2 ]
+  | Body (Binary (_, _, arg1, arg2)) -> Some [ arg1; arg2 ]
   | Body (Unary (_, _, arg))
   | Terminator (Br (arg, _, _))
   | Body (Guard (arg, _)) ->
-    [ arg ]
+    Some [ arg ]
   | Body (Call (_, _, args))
   | Body (Print args) ->
-    args
-  | Body (Alloc ((_ : Dest.t), arg)) -> [ arg ]
-  | Body (Free arg) -> [ arg ]
-  | Body (Store (arg1, arg2)) -> [ arg1; arg2 ]
-  | Body (Load ((_ : Dest.t), arg)) -> [ arg ]
-  | Body (PtrAdd ((_ : Dest.t), arg1, arg2)) -> [ arg1; arg2 ]
-  | Terminator (Ret arg) -> Option.value_map arg ~default:[] ~f:List.return
-  | Body (Phi ((_ : Dest.t), label_and_args)) -> List.map label_and_args ~f:snd
+    Some args
+  | Body (Alloc ((_ : Dest.t), arg)) -> Some [ arg ]
+  | Body (Free arg) -> Some [ arg ]
+  | Body (Store (arg1, arg2)) -> Some [ arg1; arg2 ]
+  | Body (Load ((_ : Dest.t), arg)) -> Some [ arg ]
+  | Body (PtrAdd ((_ : Dest.t), arg1, arg2)) -> Some [ arg1; arg2 ]
+  | Terminator (Ret arg) -> Some (Option.value_map arg ~default:[] ~f:List.return)
+  | Body (Phi ((_ : Dest.t), label_and_args)) -> Some (List.map label_and_args ~f:snd)
   | ( Body Nop
     | Body Speculate
     | Body Commit
     | Header (Label _)
     | Body (Const (_, _))
-    | Terminator (Jmp _) ) as instr ->
-    failwithf "Cannot call [args] on %s" (to_string instr) ()
+    | Terminator (Jmp _) ) ->
+    None
 
 let set_args args t =
   match t with

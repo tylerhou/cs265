@@ -10,9 +10,10 @@ let command =
      fun () ->
        Random.self_init ();
        let optimization_fns =
-         List.filter_map optimizations ~f:(fun opt ->
+         List.map optimizations ~f:(fun opt ->
            (* TODO: Rename these options to their module names *)
            match opt with
+           | "liveness" -> Liveness.analyze
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")

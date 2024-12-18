@@ -2,6 +2,7 @@ open! Core
 
 module type Lattice = sig
   type value
+  [@@deriving compare, equal, sexp_of]
 
   val bottom : value (* init is always bottom *)
   val top : value
