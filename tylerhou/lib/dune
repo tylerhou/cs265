@@ -1,0 +1,5 @@
+(library
+ (name opt)
+ (libraries core bril yojson)
+ (inline_tests)
+ (preprocess (pps ppx_jane)))

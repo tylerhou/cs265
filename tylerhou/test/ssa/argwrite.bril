@@ -1,0 +1,9 @@
+@main {
+  a: int = const 10;
+  cond: bool = const true;
+  br cond .here .there;
+.here:
+  a: int = const 5;
+.there:
+  print a;
+}

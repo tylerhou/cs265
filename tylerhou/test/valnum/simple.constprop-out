@@ -1,0 +1,10 @@
+@main {
+.__b0:
+  a: int = const 1;
+  b: int = const 2;
+  c: int = const 3;
+  sum1: int = const 3;
+  sum2: int = const 3;
+  prod: int = const 9;
+  ret prod;
+}

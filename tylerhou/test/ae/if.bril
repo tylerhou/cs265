@@ -1,0 +1,16 @@
+@main {
+    cond: bool = const true;
+    a: int = const 1;
+    b: int = const 2;
+    c: int = add a b;
+    br cond .left .right;
+.left:
+    d: int = add a b;
+    print d;
+    jmp .end;
+.right:
+    e: int = add a b;
+    print e;
+    jmp .end;
+.end:
+}

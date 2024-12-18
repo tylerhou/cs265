@@ -1,0 +1,9 @@
+@main {
+  v1: int = const 4;
+  v2: int = const 0;
+  mul1: int = const 0;
+  add1: int = const 4;
+  v2: int = const 3;
+  print mul1;
+  print add1;
+}

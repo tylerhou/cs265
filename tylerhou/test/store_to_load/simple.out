@@ -1,0 +1,14 @@
+@main {
+._special_entry_for_ssa:
+  zero.0: int = const 0;
+  four.0: int = const 4;
+  a.0: ptr<int> = alloc four.0;
+  b.0: ptr<int> = alloc four.0;
+  c.0: ptr<int> = ptradd a.0 zero.0;
+  d.0: ptr<ptr<int>> = alloc four.0;
+  store d.0 a.0;
+  e.0: ptr<int> = id a.0;
+  free a.0;
+  free b.0;
+  free d.0;
+}

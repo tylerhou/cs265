@@ -1,0 +1,9 @@
+@main {
+.__b0:
+  a: int = const 4;
+  jmp .end;
+.__b1:
+  print b;
+.end:
+  print a;
+}

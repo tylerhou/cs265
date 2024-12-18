@@ -1,0 +1,32 @@
+@main {
+._special_entry_for_ssa:
+.__b0:
+  one.0: int = const 1;
+  four.0: int = const 4;
+  a.0: ptr<int> = alloc four.0;
+  b.0: ptr<int> = alloc four.0;
+  c.0: ptr<int> = ptradd a.0 one.0;
+  ten.0: int = const 10;
+  twenty.0: int = const 20;
+  cond.0: bool = const true;
+  br cond.0 .t .f;
+.t:
+  store a.0 ten.0;
+  store b.0 ten.0;
+  store c.0 twenty.0;
+  jmp .end;
+.f:
+  store a.0 ten.0;
+  store b.0 twenty.0;
+  store c.0 ten.0;
+  jmp .end;
+.end:
+  al.0: int = id ten.0;
+  bl.0: int = load b.0;
+  cl.0: int = load c.0;
+  print al.0;
+  print bl.0;
+  print cl.0;
+  free a.0;
+  free b.0;
+}

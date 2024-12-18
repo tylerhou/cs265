@@ -1,0 +1,15 @@
+@main {
+    zero: int = const 0;
+    four: int = const 4;
+    a: ptr<int> = alloc four;
+    b: ptr<int> = alloc four;
+    c: ptr<int> = ptradd a zero;
+
+    d: ptr<ptr<int>> = alloc four;
+    store d a;
+    e: ptr<int> = load d;
+
+    free a;
+    free b;
+    free d;
+}

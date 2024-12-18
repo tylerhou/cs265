@@ -1,0 +1,23 @@
+benchmarks = '../benchmarks/mem/*.bril'
+extract = 'total_dyn_inst: (\d+)'
+
+[runs.baseline]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt ssa",
+    "brili -p {args}",
+]
+
+[runs.no-mem]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt ssa vbe ae cp constprop dce",
+    "brili -p {args}",
+]
+
+[runs.mem]
+pipeline = [
+    "bril2json",
+    "_build/install/default/bin/opt ssa store_to_load vbe ae cp constprop dce",
+    "brili -p {args}",
+]

@@ -1,0 +1,8 @@
+@main {
+.__b0:
+  x: int = const 1;
+.lb:
+  y: int = const 1;
+  x: int = const 2;
+  print y;
+}
