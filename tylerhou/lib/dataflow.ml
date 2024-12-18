@@ -61,6 +61,8 @@ module Make (Transfer : Transfer) = struct
 
   type t = Block.t String.Map.t [@@deriving sexp_of]
 
+  let initial_lattice : Lattice.t = { default = Lattice.bottom; values = Var.Map.empty }
+
   let of_func (func : Bril.Func.t) =
     { worklist =
         (match Transfer.direction with
@@ -69,9 +71,9 @@ module Make (Transfer : Transfer) = struct
     ; blocks =
         Map.mapi func.blocks ~f:(fun ~key:label ~data:block : Block.t ->
           { header = block.header
-          ; body = List.map block.body ~f:(fun ins -> ins, Lattice.bottom)
+          ; body = List.map block.body ~f:(fun ins -> ins, initial_lattice)
           ; terminator = block.terminator
-          ; lattice_after = Lattice.bottom
+          ; lattice_after = initial_lattice
           ; label
           })
     ; preds =
@@ -99,19 +101,77 @@ module Make (Transfer : Transfer) = struct
   let predecessors (state : state) (label : string) = Map.find_exn state.preds label
   let successors (state : state) (label : string) = Map.find_exn state.succs label
 
+  let lattice_join
+    ({ default = d1; values = vs1 } : Lattice.t)
+    ({ default = d2; values = vs2 } : Lattice.t)
+    : Lattice.t
+    =
+    let vs =
+      Map.merge vs1 vs2 ~f:(fun ~key:_ elt ->
+        Some
+          (match elt with
+           | `Both (l, r) -> Lattice.join_value l r
+           | `Left l -> l
+           | `Right r -> r))
+    in
+    { default = Lattice.join_value d1 d2; values = vs }
+  ;;
+
   let update_one (state : state) : [ `Keep_going of state | `Done of t ] =
     let run_block (label : string) (block : Block.t) : Block.t =
-      let block_begin =
-        let pred_analyses =
+      let block_begin : Lattice.t =
+        let pred_lattices, pred_block_arg_lattice_values =
           predecessors state label
-          |> List.map ~f:(fun pred -> (Map.find_exn state.blocks pred).lattice_after)
+          |> List.map ~f:(fun pred ->
+            let pred_block = Map.find_exn state.blocks pred in
+            let block_arg_list : Var.t list list =
+              match pred_block.terminator with
+              | Jmp (_, args) -> [ args ]
+              | Br (_, (l1, args1), (l2, args2)) ->
+                (if String.equal pred l1 then [ args1 ] else [])
+                @ if String.equal pred l2 then [ args2 ] else []
+              | Ret _ -> []
+            in
+            let lattice_values =
+              List.map
+                block_arg_list
+                ~f:
+                  (List.map ~f:(fun arg ->
+                     Map.find pred_block.lattice_after.values arg
+                     |> Option.value ~default:pred_block.lattice_after.default))
+            in
+            pred_block.lattice_after, lattice_values)
+          |> List.unzip
         in
-        let init =
-          if List.is_empty (predecessors state label)
-          then Lattice.init
-          else Lattice.bottom
+        let init : Lattice.t =
+          let default =
+            if List.is_empty (predecessors state label)
+            then Lattice.boundary
+            else Lattice.bottom
+          in
+          { default; values = Var.Map.empty }
         in
-        pred_analyses |> List.fold ~init ~f:Lattice.join
+        let before_block_args = pred_lattices |> List.fold ~init ~f:lattice_join in
+        let block_args =
+          let lattice_value_per_arg =
+            pred_block_arg_lattice_values
+            |> List.concat
+            |> List.transpose_exn
+            |> List.map ~f:(List.fold ~init:Lattice.bottom ~f:Lattice.join_value)
+          in
+          let (Label (_, arguments)) = block.header in
+          let arguments, _ = List.unzip arguments in
+          List.zip_exn arguments lattice_value_per_arg |> Var.Map.of_alist_exn
+        in
+        { default = before_block_args.default
+        ; values =
+            Map.merge before_block_args.values block_args ~f:(fun ~key:_ elt ->
+              Some
+                (match elt with
+                 | `Both (_l, r) -> r
+                 | `Left l -> l
+                 | `Right r -> r))
+        }
       in
       let lattice_after, body =
         fold_instructions

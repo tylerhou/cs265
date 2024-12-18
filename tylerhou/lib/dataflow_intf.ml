@@ -1,11 +1,18 @@
 open! Core
 
 module type Lattice = sig
-  type t [@@deriving compare, equal, sexp_of]
+  type value
 
-  val bottom : t
-  val init : t
-  val join : t -> t -> t
+  val bottom : value (* init is always bottom *)
+  val top : value
+  val join_value : value -> value -> value
+  val boundary : value
+
+  type t =
+    { default : value
+    ; values : value Var.Map.t
+    }
+  [@@deriving compare, equal, sexp_of]
 end
 
 module type Transfer = sig
