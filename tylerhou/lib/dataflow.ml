@@ -167,7 +167,8 @@ module Make (Transfer : Transfer) = struct
             let edges_to_this_block =
               block_args_of_terminator pred_block.terminator
               |> List.filter_map ~f:(fun (label, args) ->
-                if String.equal label pred then Some args else None)
+                eprint_s [%message "filtering" (label : string) (block.label : string)];
+                if String.equal label block.label then Some args else None)
             in
             edges_to_this_block
             |> List.concat_map ~f:(List.zip_exn params)
@@ -199,10 +200,11 @@ module Make (Transfer : Transfer) = struct
       { default; values = Var.Map.empty }
     in
     let before_block_args = lattices |> List.fold ~init ~f:lattice_join in
-    let with_block_args =
+    eprint_s [%message "" (block_arg_values : (string * Lattice.value) list)];
+    let block_args =
       List.fold
         block_arg_values
-        ~init:before_block_args
+        ~init:Lattice.{ default = Lattice.bottom; values = Var.Map.empty }
         ~f:
           (fun
             ({ default; values } : Lattice.t) ((var, value) : Var.t * Lattice.value) ->
@@ -215,7 +217,14 @@ module Make (Transfer : Transfer) = struct
           ; values = Map.set values ~key:var ~data:(Lattice.join_value before value)
           })
     in
-    with_block_args
+    { default = before_block_args.default
+    ; values =
+        Map.merge before_block_args.values block_args.values ~f:(fun ~key:_ ->
+            function
+            | `Both (_, r) -> Some r
+            | `Left l -> Some l
+            | `Right r -> Some r)
+    }
   ;;
 
   let update_one (state : state) : [ `Keep_going of state | `Done of t ] =

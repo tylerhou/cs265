@@ -1,0 +1,17 @@
+@main {
+.__b1:
+  cond: bool = const true;
+  br cond .left .right;
+.left:
+  a: int = const 1;
+  b: int = const 2;
+  jmp .end(a);
+.right:
+  a: int = const 2;
+  b: int = const 1;
+  jmp .end(b);
+.end(c: int):
+  d: int = const 1;
+  print d;
+  ret;
+}

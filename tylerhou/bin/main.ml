@@ -14,6 +14,7 @@ let command =
            (* TODO: Rename these options to their module names *)
            match opt with
            | "dce" -> Dce.run
+           | "cp" -> Cp.run
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")

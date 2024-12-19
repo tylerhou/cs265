@@ -1,0 +1,15 @@
+@main {
+  cond: bool = const true;
+  br cond .left .right;
+.left:
+  a: int = const 1;
+  b: int = const 2;
+  jmp .end(a);
+.right:
+  a: int = const 2;
+  b: int = const 1;
+  jmp .end(b);
+.end(c: int):
+  d: int = id c;
+  print d;
+}

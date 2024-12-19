@@ -1,0 +1,16 @@
+@main {
+  cond: bool = const false;
+  v0: int = const 1;
+  unused: int = const 2;
+  used: int = const 3;
+  jmp .head(v0);
+.head(v1: int):
+  br cond .body(v1) .end(v1);
+.body(v2: int):
+  jmp .head(v2);
+.end(v: int):
+  v3: int = id v;
+  used0: int = id used;
+  print v;
+  print used;
+}
