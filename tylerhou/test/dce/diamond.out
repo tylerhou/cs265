@@ -3,12 +3,12 @@
   cond: bool = const true;
   br cond .left .right;
 .left:
-  a: int = const 1;
-  jmp .end;
+  a1: int = const 1;
+  jmp .end(a1);
 .right:
-  a: int = const 2;
-  jmp .end;
-.end:
-  print a;
+  a2: int = const 2;
+  jmp .end(a2);
+.end(a3: int):
+  print a3;
   ret;
 }

@@ -5,7 +5,7 @@ let command =
   Command.basic
     ~summary:"Run optimizations on Bril JSON"
     (let%map_open.Command optimizations =
-       anon (non_empty_sequence_as_list ("pass" %: string))
+       anon (sequence ("pass" %: string))
      in
      fun () ->
        Random.self_init ();
@@ -28,6 +28,7 @@ let command =
        In_channel.input_all In_channel.stdin
        |> Yojson.Basic.from_string
        |> Bril.from_json
+       |> List.map ~f:Block_args.run
        |> List.map ~f:(fixpoint_opt 10)
        |> Bril.to_json
        |> Yojson.Basic.to_string

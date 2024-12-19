@@ -200,7 +200,6 @@ module Make (Transfer : Transfer) = struct
       { default; values = Var.Map.empty }
     in
     let before_block_args = lattices |> List.fold ~init ~f:lattice_join in
-    eprint_s [%message "" (block_arg_values : (string * Lattice.value) list)];
     let block_args =
       List.fold
         block_arg_values
