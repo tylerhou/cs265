@@ -1,0 +1,15 @@
+@main {
+.__b1:
+  cond: bool = const false;
+  v0: int = const 1;
+  used: int = const 3;
+  jmp .head(v0);
+.head(v1: int):
+  br cond .body(v1) .end(v1);
+.body(v2: int):
+  jmp .head(v2);
+.end(v: int):
+  print v;
+  print used;
+  ret;
+}
