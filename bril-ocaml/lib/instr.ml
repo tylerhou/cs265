@@ -91,32 +91,23 @@ let to_string =
       | None -> "ret"))
 
 let dest = function
-  | Header (Label _) -> None
-  | Body instr ->
-    (match instr with
-    | Const (dest, _)
-    | Binary (dest, _, _, _)
-    | Unary (dest, _, _)
-    | Phi (dest, _)
-    | Alloc (dest, _)
-    | PtrAdd (dest, _, _)
-    | Load (dest, _) ->
-      Some dest
-    | Call (dest, _, _) -> dest
-    | Nop
-    | Speculate
-    | Commit
-    | Print _
-    | Guard (_, _)
-    | Free _
-    | Store _ ->
-      None)
-  | Terminator instr ->
-    (match instr with
-    | Jmp _
-    | Br (_, _, _)
-    | Ret _ ->
-      None)
+  | Const (dest, _)
+  | Binary (dest, _, _, _)
+  | Unary (dest, _, _)
+  | Phi (dest, _)
+  | Alloc (dest, _)
+  | PtrAdd (dest, _, _)
+  | Load (dest, _) ->
+    Some dest
+  | Call (dest, _, _) -> dest
+  | Nop
+  | Speculate
+  | Commit
+  | Print _
+  | Guard (_, _)
+  | Free _
+  | Store _ ->
+    None
 
 let set_dest dest t =
   match (t, dest) with
@@ -149,12 +140,12 @@ let args = function
   | Body (PtrAdd ((_ : Dest.t), arg1, arg2)) -> Some [ arg1; arg2 ]
   | Terminator (Ret arg) -> Some (Option.value_map arg ~default:[] ~f:List.return)
   | Body (Phi ((_ : Dest.t), label_and_args)) -> Some (List.map label_and_args ~f:snd)
-  | ( Body Nop
-    | Body Speculate
-    | Body Commit
-    | Header (Label _)
-    | Body (Const (_, _))
-    | Terminator (Jmp _) ) ->
+  | Body Nop
+  | Body Speculate
+  | Body Commit
+  | Header (Label _)
+  | Body (Const (_, _))
+  | Terminator (Jmp _) ->
     None
 
 let set_args args t =

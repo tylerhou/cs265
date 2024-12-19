@@ -13,7 +13,7 @@ let command =
          List.map optimizations ~f:(fun opt ->
            (* TODO: Rename these options to their module names *)
            match opt with
-           | "liveness" -> Liveness.analyze
+           | "dce" -> Dce.run
            | other ->
              eprint_s [%message "no such optimization" (other : string)];
              failwith "no such optimization")

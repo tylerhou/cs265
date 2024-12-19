@@ -1,8 +1,7 @@
 open! Core
 
 module type Lattice = sig
-  type value
-  [@@deriving compare, equal, sexp_of]
+  type value [@@deriving compare, equal, sexp_of]
 
   val bottom : value (* init is always bottom *)
   val top : value
@@ -19,13 +18,17 @@ end
 module type Transfer = sig
   module Lattice : Lattice
 
-  val transfer : Lattice.t -> point:Program_point.t -> instr:Bril.Instr.body -> Lattice.t
+  val transfer
+    :  Lattice.t
+    -> point:Program_point.t
+    -> instr:[ `Body of Bril.Instr.body | `Terminator of Bril.Instr.terminator ]
+    -> Lattice.t
+
   val direction : [ `Forwards | `Backwards ]
 end
 
 module type S = sig
   type lattice
-  type t [@@deriving sexp_of]
   type state [@@deriving sexp_of]
 
   module Block : sig
@@ -33,7 +36,9 @@ module type S = sig
 
     val before : t -> lattice
     val after : t -> lattice
+    val header : t -> Bril.Instr.header
     val instrs : t -> Bril.Instr.body list
+    val terminator : t -> Bril.Instr.terminator
 
     type instr_with_lattice =
       { before : lattice
@@ -45,6 +50,8 @@ module type S = sig
 
     val instrs_with_lattice : t -> instr_with_lattice list
   end
+
+  type t = Block.t String.Map.t [@@deriving sexp_of]
 
   val of_func : Bril.Func.t -> state
   val update_one : state -> [ `Keep_going of state | `Done of t ]

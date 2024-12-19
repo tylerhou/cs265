@@ -36,7 +36,7 @@ type t =
   | Terminator of terminator
 [@@deriving compare, equal, sexp_of]
 
-val dest : t -> Dest.t option
+val dest : body -> Dest.t option
 val set_dest : Dest.t option -> body -> body
 val args : t -> arg list option
 val set_args : arg list -> t -> t

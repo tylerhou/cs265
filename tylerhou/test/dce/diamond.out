@@ -1,5 +1,5 @@
 @main {
-.__b0:
+.__b1:
   cond: bool = const true;
   br cond .left .right;
 .left:
@@ -10,4 +10,5 @@
   jmp .end;
 .end:
   print a;
+  ret;
 }

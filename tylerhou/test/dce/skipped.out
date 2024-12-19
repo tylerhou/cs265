@@ -1,9 +1,11 @@
 @main {
-.__b0:
+.__b1:
   a: int = const 4;
   jmp .end;
-.__b1:
+.__b2:
   print b;
+  jmp .end;
 .end:
   print a;
+  ret;
 }

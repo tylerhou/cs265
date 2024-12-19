@@ -33,7 +33,9 @@ module Make (Transfer : Transfer) = struct
     ;;
 
     let after (t : t) = t.lattice_after
+    let header (t : t) = t.header
     let instrs (t : t) = List.map t.body ~f:fst
+    let terminator (t : t) = t.terminator
 
     let instrs_with_lattice (t : t) : instr_with_lattice list =
       let output, _ =
@@ -64,6 +66,11 @@ module Make (Transfer : Transfer) = struct
   let initial_lattice : Lattice.t = { default = Lattice.bottom; values = Var.Map.empty }
 
   let of_func (func : Bril.Func.t) =
+    let preds, succs =
+      match Transfer.direction with
+      | `Forwards -> func.preds, func.succs
+      | `Backwards -> func.succs, func.preds
+    in
     { worklist =
         (match Transfer.direction with
          | `Forwards -> func.order
@@ -76,26 +83,35 @@ module Make (Transfer : Transfer) = struct
           ; lattice_after = initial_lattice
           ; label
           })
-    ; preds =
-        (match Transfer.direction with
-         | `Forwards -> func.preds
-         | `Backwards -> func.succs)
-    ; succs =
-        (match Transfer.direction with
-         | `Forwards -> func.succs
-         | `Backwards -> func.preds)
+    ; preds
+    ; succs
     }
   ;;
 
-  let fold_instructions instrs ~init ~f =
-    let instrs = List.mapi instrs ~f:(fun i x -> i, x) in
-    let before, after =
-      match Transfer.direction with
-      | `Forwards -> Fn.id, List.rev
-      | `Backwards -> List.rev, Fn.id
-    in
-    let analysis, instrs = List.fold (before instrs) ~init ~f in
-    analysis, after instrs
+  let fold_instructions (block : Block.t) ~before ~f =
+    let body = List.mapi block.body ~f:(fun i (body, _lattice) -> i, body) in
+    let terminator = List.length block.body, `Terminator block.terminator in
+    match Transfer.direction with
+    | `Forwards ->
+      let analysis_before_terminator, rev_body =
+        List.fold body ~init:(before, []) ~f:(fun (before, rev_body) (i, instr) ->
+          let after = f before (i, `Body instr) in
+          after, (instr, before) :: rev_body)
+      in
+      let analysis = f analysis_before_terminator terminator in
+      let body = List.rev rev_body in
+      analysis, body
+    | `Backwards ->
+      let analysis_before_body = f before terminator in
+      let analysis, body =
+        List.fold
+          (List.rev body)
+          ~init:(analysis_before_body, [])
+          ~f:(fun (before, body) (i, instr) ->
+            let after = f before (i, `Body instr) in
+            after, (instr, before) :: body)
+      in
+      analysis, body
   ;;
 
   let predecessors (state : state) (label : string) = Map.find_exn state.preds label
@@ -117,83 +133,115 @@ module Make (Transfer : Transfer) = struct
     { default = Lattice.join_value d1 d2; values = vs }
   ;;
 
+  let join_predecessors (state : state) (block : Block.t) : Lattice.t =
+    let block_args_of_terminator (terminator : Bril.Instr.terminator)
+      : (string * string list) list
+      =
+      match terminator with
+      | Jmp (label, args) -> [ label, args ]
+      | Br (_, (l1, args1), (l2, args2)) -> [ l1, args1; l2, args2 ]
+      | Ret _ -> []
+    in
+    let block_params_of_header (Label (_, params_and_type) : Bril.Instr.header)
+      : string list
+      =
+      List.map ~f:fst params_and_type
+    in
+    let find_lattice_value_or_default (pred_block : Block.t) arg =
+      Map.find pred_block.lattice_after.values arg
+      |> Option.value ~default:pred_block.lattice_after.default
+    in
+    let lattices_and_block_argument_values
+      : (Lattice.t * (Var.t * Lattice.value) list) list
+      =
+      match Transfer.direction with
+      | `Forwards ->
+        (* This is a forwards analysis, so the logical predecessors of a block A
+           transfer A lattice values via block arguments.
+        *)
+        predecessors state block.label
+        |> List.map ~f:(fun pred ->
+          let pred_block = Map.find_exn state.blocks pred in
+          let params = block_params_of_header block.header in
+          let lattice_values : (Var.t * Lattice.value) list =
+            let edges_to_this_block =
+              block_args_of_terminator pred_block.terminator
+              |> List.filter_map ~f:(fun (label, args) ->
+                if String.equal label pred then Some args else None)
+            in
+            edges_to_this_block
+            |> List.concat_map ~f:(List.zip_exn params)
+            |> List.map ~f:(fun (param, arg) ->
+              param, find_lattice_value_or_default pred_block arg)
+          in
+          pred_block.lattice_after, lattice_values)
+      | `Backwards ->
+        (* This is a backwards analysis, so the logical predecessors (physical
+           successors) of a block A transfer A lattice values if A jumps to
+           that predecessor. *)
+        block_args_of_terminator block.terminator
+        |> List.map ~f:(fun (pred, args) ->
+          let pred_block = Map.find_exn state.blocks pred in
+          let lattice_values =
+            block_params_of_header pred_block.header
+            |> List.map ~f:(find_lattice_value_or_default pred_block)
+          in
+          pred_block.lattice_after, List.zip_exn args lattice_values)
+    in
+    let lattices, block_arg_values = List.unzip lattices_and_block_argument_values in
+    let block_arg_values = List.concat block_arg_values in
+    let init : Lattice.t =
+      let default =
+        if List.is_empty (predecessors state block.label)
+        then Lattice.boundary
+        else Lattice.bottom
+      in
+      { default; values = Var.Map.empty }
+    in
+    let before_block_args = lattices |> List.fold ~init ~f:lattice_join in
+    let with_block_args =
+      List.fold
+        block_arg_values
+        ~init:before_block_args
+        ~f:
+          (fun
+            ({ default; values } : Lattice.t) ((var, value) : Var.t * Lattice.value) ->
+          let before =
+            match Map.find values var with
+            | None -> default
+            | Some existing -> existing
+          in
+          { default
+          ; values = Map.set values ~key:var ~data:(Lattice.join_value before value)
+          })
+    in
+    with_block_args
+  ;;
+
   let update_one (state : state) : [ `Keep_going of state | `Done of t ] =
-    let run_block (label : string) (block : Block.t) : Block.t =
-      let block_begin : Lattice.t =
-        let pred_lattices, pred_block_arg_lattice_values =
-          predecessors state label
-          |> List.map ~f:(fun pred ->
-            let pred_block = Map.find_exn state.blocks pred in
-            let block_arg_list : Var.t list list =
-              match pred_block.terminator with
-              | Jmp (_, args) -> [ args ]
-              | Br (_, (l1, args1), (l2, args2)) ->
-                (if String.equal pred l1 then [ args1 ] else [])
-                @ if String.equal pred l2 then [ args2 ] else []
-              | Ret _ -> []
-            in
-            let lattice_values =
-              List.map
-                block_arg_list
-                ~f:
-                  (List.map ~f:(fun arg ->
-                     Map.find pred_block.lattice_after.values arg
-                     |> Option.value ~default:pred_block.lattice_after.default))
-            in
-            pred_block.lattice_after, lattice_values)
-          |> List.unzip
-        in
-        let init : Lattice.t =
-          let default =
-            if List.is_empty (predecessors state label)
-            then Lattice.boundary
-            else Lattice.bottom
-          in
-          { default; values = Var.Map.empty }
-        in
-        let before_block_args = pred_lattices |> List.fold ~init ~f:lattice_join in
-        let block_args =
-          let lattice_value_per_arg =
-            pred_block_arg_lattice_values
-            |> List.concat
-            |> List.transpose_exn
-            |> List.map ~f:(List.fold ~init:Lattice.bottom ~f:Lattice.join_value)
-          in
-          let (Label (_, arguments)) = block.header in
-          let arguments, _ = List.unzip arguments in
-          List.zip_exn arguments lattice_value_per_arg |> Var.Map.of_alist_exn
-        in
-        { default = before_block_args.default
-        ; values =
-            Map.merge before_block_args.values block_args ~f:(fun ~key:_ elt ->
-              Some
-                (match elt with
-                 | `Both (_l, r) -> r
-                 | `Left l -> l
-                 | `Right r -> r))
-        }
-      in
+    let run_block (block : Block.t) : Block.t =
+      let block_begin : Lattice.t = join_predecessors state block in
       let lattice_after, body =
-        fold_instructions
-          block.body
-          ~init:(block_begin, [])
-          ~f:(fun (before, instrs) (i, (instr, _block_end)) ->
-            (* eprint_s [%message "before transfer" (before : Lattice.t)]; *)
-            (* eprint_s [%message "    " (instr : Bril.Instr.body)]; *)
-            let after =
-              Transfer.transfer before ~point:{ block = label; instruction = i } ~instr
-            in
-            (* eprint_s [%message "after transfer" (after : Lattice.t)]; *)
-            after, (instr, before) :: instrs)
+        fold_instructions block ~before:block_begin ~f:(fun before (i, instr) ->
+          (* eprint_s [%message "before transfer" (before : Lattice.t)]; *)
+          (* eprint_s [%message "    " (instr : Bril.Instr.body)]; *)
+          let after =
+            Transfer.transfer
+              before
+              ~point:{ block = block.label; instruction = i }
+              ~instr
+          in
+          (* eprint_s [%message "after transfer" (after : Lattice.t)]; *)
+          after)
       in
-      { header = block.header; body; terminator = block.terminator; lattice_after; label }
+      { block with body; lattice_after }
     in
     match state.worklist with
     | [] -> `Done state.blocks
     | label :: rest ->
       (* eprint_s [%message "processing" (label : string)]; *)
       let before = Map.find_exn state.blocks label in
-      let after = run_block label before in
+      let after = run_block before in
       let blocks = Map.set state.blocks ~key:label ~data:after in
       let worklist =
         (* We just ran the analysis on label, remove instances of it from the

@@ -27,15 +27,20 @@ end
 module Transfer = struct
   module Lattice = Liveness
 
-  let transfer ({ default; values } : Liveness.t) ~point:_ ~(instr : Bril.Instr.body)
-    : Liveness.t
-    =
+  let transfer ({ default; values } : Liveness.t) ~point:_ ~instr : Liveness.t =
     let killed =
-      match Bril.Instr.dest (Body instr) with
-      | None -> values
-      | Some (dest, _) -> Map.remove values dest
+      match instr with
+      | `Body instr ->
+        (match Bril.Instr.dest instr with
+         | None -> values
+         | Some (dest, _) -> Map.remove values dest)
+      | `Terminator _ -> values
     in
-    let args = Bril.Instr.args (Body instr) in
+    let args =
+      match instr with
+      | `Body instr -> Bril.Instr.args (Body instr)
+      | `Terminator instr -> Bril.Instr.args (Terminator instr)
+    in
     let values : Liveness.value Var.Map.t =
       match args with
       | None -> killed
@@ -54,5 +59,5 @@ module Analysis = Dataflow.Make (Transfer)
 let analyze func =
   let blocks = Analysis.run func in
   eprint_s [%message "liveness" (blocks : Analysis.Block.t String.Map.t)];
-  func
+  blocks
 ;;

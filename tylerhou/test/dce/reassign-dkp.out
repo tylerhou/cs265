@@ -1,4 +1,6 @@
 @main {
+.__b1:
   a: int = const 42;
   print a;
+  ret;
 }
