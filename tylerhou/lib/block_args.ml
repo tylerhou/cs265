@@ -1,5 +1,10 @@
 open! Core
 
+type renamed_type =
+  | Type of Bril.Bril_type.t
+  | Typeof of Var.t
+[@@deriving compare, equal, sexp_of, variants]
+
 let run (func : Bril.Func.t) : Bril.Func.t =
   let assignment_counts_by_var : (int Var.Map.t, exn) Result.t =
     Result.try_with (fun () ->
@@ -114,11 +119,11 @@ let run (func : Bril.Func.t) : Bril.Func.t =
        Add block arguments for terminators. Keep track of the types of block
        arguments, so we can add block parameters.
     *)
-    let param_types_by_block, blocks_with_renamed_dests_and_args =
-      List.fold_map
+    let (type_by_renamed, param_types_by_block), blocks_with_renamed_dests_and_args =
+      List.fold_mapi
         blocks_with_renamed_dests
-        ~init:String.Map.empty
-        ~f:(fun param_types_by_block (label, instrs) ->
+        ~init:(Var.Map.empty, String.Map.empty)
+        ~f:(fun _i (type_by_renamed, param_types_by_block) (label, instrs) ->
           let reaching_by_original : Var.t Var.Map.t =
             Map.find_exn params_by_block label
             |> List.map ~f:(fun renamed ->
@@ -126,10 +131,12 @@ let run (func : Bril.Func.t) : Bril.Func.t =
               original, renamed)
             |> Var.Map.of_alist_exn
           in
-          let (_, _, param_types_by_block), instrs_with_renamed_dests_and_args =
+          let ( (_, type_by_renamed, param_types_by_block)
+              , instrs_with_renamed_dests_and_args )
+            =
             List.fold_map
               instrs
-              ~init:(reaching_by_original, Var.Map.empty, param_types_by_block)
+              ~init:(reaching_by_original, type_by_renamed, param_types_by_block)
               ~f:
                 (fun
                   (reaching_by_original, type_by_renamed, param_types_by_block) instr ->
@@ -148,12 +155,14 @@ let run (func : Bril.Func.t) : Bril.Func.t =
                   let make_block_args dest =
                     Map.find_exn params_by_block dest
                     |> List.map ~f:(fun renamed ->
-                      let reaching =
-                        renamed
-                        |> Map.find_exn original_by_renamed
-                        |> Map.find_exn reaching_by_original
+                      let original = Map.find_exn original_by_renamed renamed in
+                      let reaching = Map.find_exn reaching_by_original original in
+                      let type_ =
+                        match Map.find type_by_renamed reaching with
+                        | Some type_ -> Type type_
+                        | None -> Typeof reaching
                       in
-                      reaching, reaching |> Map.find_exn type_by_renamed)
+                      reaching, type_)
                     |> List.unzip
                   in
                   match instr_with_renamed_args with
@@ -167,8 +176,8 @@ let run (func : Bril.Func.t) : Bril.Func.t =
                        let args1, param_types1 = make_block_args l1
                        and args2, param_types2 = make_block_args l2 in
                        ( param_types_by_block
-                         |> Map.add_multi ~key:label ~data:param_types1
-                         |> Map.add_multi ~key:label ~data:param_types2
+                         |> Map.add_multi ~key:l1 ~data:param_types1
+                         |> Map.add_multi ~key:l2 ~data:param_types2
                        , Terminator (Br (cond, (l1, args1), (l2, args2))) )
                      | Ret _ -> param_types_by_block, instr_with_renamed_args)
                   | _ -> param_types_by_block, instr_with_renamed_args
@@ -196,14 +205,61 @@ let run (func : Bril.Func.t) : Bril.Func.t =
                 ( (reaching_by_original, type_by_renamed, param_types_by_block)
                 , instr_with_renamed_args ))
           in
-          param_types_by_block, (label, instrs_with_renamed_dests_and_args))
+          ( (type_by_renamed, param_types_by_block)
+          , (label, instrs_with_renamed_dests_and_args) ))
     in
-    let param_types_by_block =
-      Map.map param_types_by_block ~f:(fun (types : Bril.Bril_type.t list list) ->
-        (* Each list is non-empty since we used add_multi. *)
-        types
-        |> List.all_equal ~equal:(List.equal Bril.Bril_type.equal)
-        |> Option.value_exn)
+    let _, param_types_by_block =
+      let with_collapsed_types =
+        Map.map param_types_by_block ~f:(fun (types : renamed_type list list) ->
+          (* Each list is non-empty since we used add_multi. *)
+          types
+          |> List.transpose_exn
+          |> List.map
+               ~f:
+                 (List.reduce_exn ~f:(fun t1 t2 ->
+                    match t1, t2 with
+                    | Type l, Type _ -> Type l (* Could raise if [l != r]. *)
+                    | Typeof _, Type t | Type t, Typeof _ -> Type t
+                    | Typeof l, Typeof _ -> Typeof l)))
+      in
+      let rec loop with_collapsed_types (type_by_renamed, param_types_by_block) =
+        if Map.is_empty with_collapsed_types
+        then type_by_renamed, param_types_by_block
+        else (
+          let block, grounded_types =
+            Map.fold_until
+              with_collapsed_types
+              ~init:()
+              ~f:(fun ~key ~data () ->
+                match
+                  data
+                  |> List.map ~f:(function
+                    | Type t -> Some t
+                    | Typeof var -> Map.find type_by_renamed var)
+                  |> Option.all
+                with
+                | Some grounded -> Stop (key, grounded)
+                | None -> Continue ())
+              ~finish:(fun () ->
+                Error.raise_s
+                  [%message
+                    "no block with grounded params"
+                      (with_collapsed_types : renamed_type list String.Map.t)
+                      (type_by_renamed : Bril.Bril_type.t Var.Map.t)])
+          in
+          let params = Map.find_exn params_by_block block in
+          let type_by_renamed =
+            List.zip_exn params grounded_types
+            |> List.fold ~init:type_by_renamed ~f:(fun type_by_renamed (param, type_) ->
+              Map.add_exn type_by_renamed ~key:param ~data:type_)
+          and param_types_by_block =
+            Map.add_exn param_types_by_block ~key:block ~data:grounded_types
+          in
+          loop
+            (Map.remove with_collapsed_types block)
+            (type_by_renamed, param_types_by_block))
+      in
+      loop with_collapsed_types (type_by_renamed, String.Map.empty)
     in
     let instructions =
       blocks_with_renamed_dests_and_args

@@ -1,11 +1,12 @@
 @main {
-.__b0:
-  a.0: int = const 10;
-  cond.0: bool = const true;
-  br cond.0 .here .there;
+.__b1:
+  a0: int = const 10;
+  cond: bool = const true;
+  br cond .here .there(a0);
 .here:
-  a.1: int = const 5;
-.there:
-  a.2: int = phi a.0 a.1 .__b0 .here;
-  print a.2;
+  a1: int = const 5;
+  jmp .there(a1);
+.there(a2: int):
+  print a2;
+  ret;
 }

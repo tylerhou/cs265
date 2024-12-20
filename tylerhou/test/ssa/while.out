@@ -1,18 +1,16 @@
 @main {
-.__b0:
-  a.0: int = const 10;
-.while.cond:
-  is_term.0: bool = phi __undefined is_term.1 .__b0 .while.body;
-  a.1: int = phi a.0 a.2 .__b0 .while.body;
-  zero.0: int = phi __undefined zero.1 .__b0 .while.body;
-  one.0: int = phi __undefined one.1 .__b0 .while.body;
-  zero.1: int = const 0;
-  is_term.1: bool = eq a.1 zero.1;
-  br is_term.1 .while.finish .while.body;
-.while.body:
-  one.1: int = const 1;
-  a.2: int = sub a.1 one.1;
-  jmp .while.cond;
-.while.finish:
-  print a.1;
+.__b1:
+  a0: int = const 10;
+  jmp .while.cond(a0);
+.while.cond(a1: int):
+  zero: int = const 0;
+  is_term: bool = eq a1 zero;
+  br is_term .while.finish(a1) .while.body(a1);
+.while.body(a2: int):
+  one: int = const 1;
+  a3: int = sub a2 one;
+  jmp .while.cond(a3);
+.while.finish(a4: int):
+  print a4;
+  ret;
 }

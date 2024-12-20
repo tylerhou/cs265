@@ -1,16 +1,17 @@
 @main {
-.__b0:
-  cond.0: bool = const true;
+.__b1:
+  cond: bool = const true;
+  jmp .entry;
 .entry:
-  a.0: int = const 47;
-  br cond.0 .left .right;
-.left:
-  a.1: int = add a.0 a.0;
-  jmp .exit;
-.right:
-  a.2: int = mul a.0 a.0;
-  jmp .exit;
-.exit:
-  a.3: int = phi a.1 a.2 .left .right;
-  print a.3;
+  a0: int = const 47;
+  br cond .left(a0) .right(a0);
+.left(a1: int):
+  a2: int = add a1 a1;
+  jmp .exit(a2);
+.right(a3: int):
+  a4: int = mul a3 a3;
+  jmp .exit(a4);
+.exit(a5: int):
+  print a5;
+  ret;
 }

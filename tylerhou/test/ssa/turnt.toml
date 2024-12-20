@@ -1,8 +1,8 @@
 [envs.compile]
-    command = "bril2json < {filename} | ../../_build/install/default/bin/opt ssa | bril2txt"
+    command = "bril2json < {filename} | ../../_build/install/default/bin/opt | bril2txt"
 
 [envs.interp]
-    command = "bril2json < {filename} | ../../_build/install/default/bin/opt ssa | brili -p"
+    command = "bril2json < {filename} | ../../_build/install/default/bin/opt | brili -p"
     output.stdout = "-"
 
 [envs.interp-ref]
